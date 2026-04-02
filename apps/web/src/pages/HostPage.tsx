@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
-import type { GameSessionSummary, MatchFinishedEvent, RosterPlayer, SnapshotEvent } from "@crowdplay/protocol";
+import type { MatchFinishedEvent, RosterPlayer, SnapshotEvent } from "@crowdplay/protocol";
 
 import { HostLobbyStage } from "../components/HostLobbyStage";
 import { Leaderboard } from "../components/Leaderboard";
@@ -30,7 +30,6 @@ export function HostPage() {
   const [phase, setPhase] = useState("lobby");
   const [remainingMs, setRemainingMs] = useState(0);
   const [result, setResult] = useState<MatchFinishedEvent | null>(null);
-  const [summary, setSummary] = useState<GameSessionSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const socketUrl = useMemo(() => (hostToken ? buildSessionSocketUrl(code, hostToken) : null), [code, hostToken]);
@@ -41,7 +40,6 @@ export function HostPage() {
       switch (event.type) {
         case "join_ack":
           setPhase(event.phase);
-          setSummary(event.summary);
           break;
         case "roster_update":
           setRoster(event.players);
@@ -87,24 +85,14 @@ export function HostPage() {
       r: player.rank
     }));
 
-  const joinLabel = typeof window !== "undefined" ? `${window.location.host}/join` : "/join";
-  const canStart = roster.length >= 2;
-
   if (phase === "lobby") {
     return (
       <div className="min-h-screen space-y-6 px-4 py-6 sm:px-6 lg:px-8">
         <HostLobbyStage
           code={code}
           gameLabel="TapDash"
-          playerCount={roster.length}
-          playerLimit={summary?.config.playerLimit}
-          minimumPlayers={2}
-          canStart={canStart}
-          joiningLabel={joinLabel}
           onStart={() => startSession(code, hostToken).catch((startError) => setError(startError instanceof Error ? startError.message : "Unable to start match."))}
-          error={error}
-          statusText={error ? undefined : `Socket ${status}. Start as soon as at least 2 players are ready.`}
-          startDisabled={!canStart}
+          startDisabled={roster.length < 2}
         />
         <LobbyRosterGrid players={roster} />
       </div>
