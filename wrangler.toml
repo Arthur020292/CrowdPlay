@@ -1,0 +1,24 @@
+name = "crowdplay"
+main = "apps/worker/src/index.ts"
+compatibility_date = "2026-04-02"
+
+[assets]
+directory = "./apps/web/dist"
+binding = "ASSETS"
+
+[[durable_objects.bindings]]
+name = "GAME_SESSIONS"
+class_name = "GameSessionDurableObject"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["GameSessionDurableObject"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "crowdplay"
+database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+migrations_dir = "./migrations"
+
+[vars]
+APP_NAME = "CrowdPlay"

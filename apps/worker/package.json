@@ -1,0 +1,19 @@
+{
+  "name": "@crowdplay/worker",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "wrangler dev",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@crowdplay/game-tapdash": "0.1.0",
+    "@crowdplay/protocol": "0.1.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3",
+    "wrangler": "^4.10.0"
+  }
+}
