@@ -1,3 +1,5 @@
+import { getPlayerColorHex } from "@crowdplay/protocol";
+
 import type { MatchStanding, RosterPlayer, SnapshotPlayer } from "@crowdplay/protocol";
 
 type Row = MatchStanding | RosterPlayer | SnapshotPlayer;
@@ -23,6 +25,10 @@ export function Leaderboard({ players, title }: LeaderboardProps) {
           >
             <div>
               <div className="text-sm font-semibold text-white">
+                <span
+                  className="mr-2 inline-block size-3 rounded-full align-middle"
+                  style={{ backgroundColor: "color" in player ? getPlayerColorHex(player.color) : "#22d3ee" }}
+                />
                 {index + 1}. {player.name}
               </div>
               <div className="text-xs text-slate-400">

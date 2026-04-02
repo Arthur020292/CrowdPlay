@@ -3,9 +3,20 @@ import { z } from "zod";
 export const PROTOCOL_VERSION = 1;
 export const GAME_PHASES = ["lobby", "countdown", "live", "finished", "archived", "expired"] as const;
 export const PLAYER_STATUSES = ["connected", "disconnected", "finished", "kicked"] as const;
+export const PLAYER_COLOR_PRESETS = [
+  { id: "cyan", label: "Cyan", hex: "#22d3ee" },
+  { id: "amber", label: "Amber", hex: "#f59e0b" },
+  { id: "rose", label: "Rose", hex: "#fb7185" },
+  { id: "lime", label: "Lime", hex: "#a3e635" },
+  { id: "violet", label: "Violet", hex: "#818cf8" },
+  { id: "pink", label: "Pink", hex: "#f472b6" }
+] as const;
 
 export type GamePhase = (typeof GAME_PHASES)[number];
 export type PlayerStatus = (typeof PLAYER_STATUSES)[number];
+export type PlayerColorId = (typeof PLAYER_COLOR_PRESETS)[number]["id"];
+
+export const playerColorIdSchema = z.enum(PLAYER_COLOR_PRESETS.map((preset) => preset.id) as [PlayerColorId, ...PlayerColorId[]]);
 
 export const sessionConfigSchema = z.object({
   gameType: z.literal("tapdash").default("tapdash"),
@@ -21,6 +32,7 @@ export type SessionConfig = z.infer<typeof sessionConfigSchema>;
 export interface SessionPlayer {
   playerId: string;
   name: string;
+  color: PlayerColorId;
   joinedAt: number;
   connected: boolean;
   lastSeenAt: number;
@@ -46,6 +58,7 @@ export interface GameSessionSummary {
 export interface MatchStanding {
   playerId: string;
   name: string;
+  color: PlayerColorId;
   rank: number;
   distance: number;
   totalTaps: number;
@@ -72,6 +85,7 @@ export interface MatchResult {
 export interface SnapshotPlayer {
   id: string;
   name: string;
+  color: PlayerColorId;
   d: number;
   r: number;
   t: number;
@@ -81,6 +95,7 @@ export interface SnapshotPlayer {
 export interface RosterPlayer {
   id: string;
   name: string;
+  color: PlayerColorId;
   connected: boolean;
   rank: number;
   distance: number;
@@ -93,7 +108,8 @@ export const createSessionRequestSchema = z.object({
 });
 
 export const joinSessionRequestSchema = z.object({
-  name: z.string().trim().min(1).max(24)
+  name: z.string().trim().min(1).max(24),
+  color: playerColorIdSchema
 });
 
 export const createSessionResponseSchema = z.object({
@@ -233,6 +249,14 @@ export const defaultSessionConfig: SessionConfig = {
 
 export function parseClientEvent(payload: unknown): ClientEvent {
   return clientEventSchema.parse(payload);
+}
+
+export function getPlayerColorHex(colorId: PlayerColorId): string {
+  return PLAYER_COLOR_PRESETS.find((preset) => preset.id === colorId)?.hex ?? PLAYER_COLOR_PRESETS[0].hex;
+}
+
+export function getDefaultPlayerColor(index = 0): PlayerColorId {
+  return PLAYER_COLOR_PRESETS[index % PLAYER_COLOR_PRESETS.length].id;
 }
 
 export function safeParseServerEvent(payload: unknown): ServerEvent | null {

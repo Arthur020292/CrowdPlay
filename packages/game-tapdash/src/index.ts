@@ -53,6 +53,7 @@ export function buildStandings(players: SessionPlayer[]): MatchStanding[] {
     .map((player, index) => ({
       playerId: player.playerId,
       name: player.name,
+      color: player.color,
       rank: index + 1,
       distance: roundNumber(player.distance),
       totalTaps: player.totalTaps

@@ -1,11 +1,13 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 
-import { PROTOCOL_VERSION, type MatchFinishedEvent, type SnapshotEvent } from "@crowdplay/protocol";
+import { PLAYER_COLOR_PRESETS, PROTOCOL_VERSION, getDefaultPlayerColor, getPlayerColorHex, type MatchFinishedEvent, type PlayerColorId, type SnapshotEvent } from "@crowdplay/protocol";
 
+import { ColorPresetPicker } from "../components/ColorPresetPicker";
 import { useSessionSocket } from "../hooks/useSessionSocket";
 import { buildSessionSocketUrl, joinSession } from "../lib/api";
 import { getPlayerSession, savePlayerSession } from "../lib/storage";
+import { formatRemainingLabel } from "../lib/time";
 
 export function PlayPage() {
   const params = useParams();
@@ -13,6 +15,7 @@ export function PlayPage() {
   const stored = getPlayerSession(code);
 
   const [name, setName] = useState(stored?.name ?? "");
+  const [color, setColor] = useState<PlayerColorId>((stored?.color as PlayerColorId | undefined) ?? getDefaultPlayerColor());
   const [playerId, setPlayerId] = useState(stored?.playerId ?? "");
   const [playerToken, setPlayerToken] = useState(stored?.playerToken ?? "");
   const [phase, setPhase] = useState("lobby");
@@ -91,11 +94,12 @@ export function PlayPage() {
     setError(null);
 
     try {
-      const joined = await joinSession(code, name);
+      const joined = await joinSession(code, name, color);
       setPlayerId(joined.playerId);
       setPlayerToken(joined.playerToken);
       savePlayerSession({
         code,
+        color,
         name,
         playerId: joined.playerId,
         playerToken: joined.playerToken
@@ -122,6 +126,7 @@ export function PlayPage() {
             placeholder="Your name"
             maxLength={24}
           />
+          <ColorPresetPicker selectedColor={color} onChange={setColor} />
           {error ? <p className="text-sm text-rose-300">{error}</p> : null}
           <button
             disabled={!name.trim() || submitting}
@@ -142,6 +147,10 @@ export function PlayPage() {
         <p className="mt-2 text-sm text-slate-400">
           Session {code} • Socket {status} • Phase {phase}
         </p>
+        <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-slate-950/70 px-3 py-2 text-sm text-slate-200">
+          <span className="inline-block size-3 rounded-full" style={{ backgroundColor: getPlayerColorHex(me?.color ?? color) }} />
+          {PLAYER_COLOR_PRESETS.find((preset) => preset.id === color)?.label ?? "Color"}
+        </div>
 
         <div className="mt-6 rounded-[1.5rem] border border-white/10 bg-slate-950/80 p-4">
           <div className="flex items-center justify-between text-sm text-slate-300">
@@ -154,7 +163,7 @@ export function PlayPage() {
           </div>
           <div className="mt-3 flex items-center justify-between text-sm text-slate-300">
             <span>Remaining</span>
-            <span className="text-lg font-semibold text-white">{Math.ceil(remainingMs / 1000)}s</span>
+            <span className="text-lg font-semibold text-white">{formatRemainingLabel(phase, remainingMs)}</span>
           </div>
           <div className="mt-4 h-3 overflow-hidden rounded-full bg-white/10">
             <div className="h-full rounded-full bg-cyan-400 transition-all" style={{ width: `${progress}%` }} />

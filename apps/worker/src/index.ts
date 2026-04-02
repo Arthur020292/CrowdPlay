@@ -62,7 +62,7 @@ async function joinSession(env: Env, request: Request, code: string): Promise<Re
   const joinResponse = await stub.fetch("https://session/internal/join", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ playerId, name: body.name })
+    body: JSON.stringify({ playerId, name: body.name, color: body.color })
   });
 
   if (!joinResponse.ok) {
