@@ -31,8 +31,8 @@ function DevSection({
   return (
     <section className="space-y-4">
       <div>
-        <p className="text-sm uppercase tracking-[0.35em] text-cyan-200/80">{title}</p>
-        <p className="mt-2 text-sm text-slate-400">{description}</p>
+        <p className="cp-dev-text text-sm uppercase tracking-[0.35em]">{title}</p>
+        <p className="cp-dev-subtext mt-2 text-sm">{description}</p>
       </div>
       {children}
     </section>
@@ -223,9 +223,9 @@ export function DevScreensPage() {
   return (
     <div className="space-y-12">
       <section className="rounded-[2rem] border border-cyan-300/20 bg-cyan-400/10 p-6">
-        <p className="text-sm uppercase tracking-[0.35em] text-cyan-100">Dev Preview</p>
-        <h1 className="mt-3 text-4xl font-black text-white">TapDash screen gallery</h1>
-        <p className="mt-3 max-w-3xl text-slate-200">
+        <p className="cp-dev-text text-sm uppercase tracking-[0.35em]">Dev Preview</p>
+        <h1 className="cp-dev-text mt-3 text-4xl font-black">TapDash screen gallery</h1>
+        <p className="cp-dev-subtext mt-3 max-w-3xl">
           Review the redesigned onboarding and host screens without creating a live session. These are fixture-driven snapshots for visual iteration.
         </p>
       </section>
