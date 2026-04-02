@@ -113,16 +113,16 @@ export function HostPage() {
   return (
     <div className="space-y-6">
       <section className="grid gap-6 xl:grid-cols-[1.4fr_0.6fr]">
-        <div className="cp-card-dark p-6">
+        <div className="cp-card-panel p-6">
           <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-sm uppercase tracking-[0.35em] text-cyan-200/80">Host Screen</p>
-              <h1 className="mt-2 text-4xl font-black tracking-tight text-white">{code}</h1>
-              <p className="mt-2 text-sm text-slate-400">Socket {status} • Phase {phase}</p>
+              <p className="text-sm uppercase tracking-[0.35em] text-sky-700/80">Host Screen</p>
+              <h1 className="mt-2 text-4xl font-black tracking-tight text-slate-950">{code}</h1>
+              <p className="mt-2 text-sm text-slate-500">Socket {status} • Phase {phase}</p>
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
-              <div className="rounded-full border border-white/10 bg-white/[0.08] px-4 py-2 text-sm text-slate-300">
+              <div className="rounded-full border border-slate-200 bg-white/[0.84] px-4 py-2 text-sm font-medium text-slate-600">
                 Remaining {formatRemainingLabel(phase, remainingMs)}
               </div>
               <button
@@ -145,9 +145,9 @@ export function HostPage() {
           <RaceCanvas snapshot={snapshot} previousSnapshot={previousSnapshot} />
 
           {result ? (
-            <div className="mt-6 rounded-[1.75rem] border border-amber-300/20 bg-amber-400/10 p-5">
-              <div className="text-sm uppercase tracking-[0.35em] text-amber-200/80">Podium</div>
-              <div className="mt-3 text-2xl font-black text-white">
+            <div className="mt-6 rounded-[1.75rem] border border-amber-200 bg-amber-50/90 p-5">
+              <div className="text-sm uppercase tracking-[0.35em] text-amber-700/80">Podium</div>
+              <div className="mt-3 text-2xl font-black text-slate-950">
                 {result.standings.slice(0, 3).map((standing) => standing.name).join(" • ")}
               </div>
               <button
@@ -159,7 +159,7 @@ export function HostPage() {
             </div>
           ) : null}
 
-          {error ? <p className="mt-4 text-sm text-rose-300">{error}</p> : null}
+          {error ? <p className="mt-4 text-sm text-rose-600">{error}</p> : null}
         </div>
 
         <Leaderboard players={livePlayers} title={phase === "lobby" ? "Lobby roster" : "Live standings"} />
