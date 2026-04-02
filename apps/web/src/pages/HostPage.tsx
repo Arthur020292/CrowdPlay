@@ -1,9 +1,11 @@
 import { useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
-import type { MatchFinishedEvent, RosterPlayer, SnapshotEvent } from "@crowdplay/protocol";
+import type { GameSessionSummary, MatchFinishedEvent, RosterPlayer, SnapshotEvent } from "@crowdplay/protocol";
 
+import { HostLobbyStage } from "../components/HostLobbyStage";
 import { Leaderboard } from "../components/Leaderboard";
+import { LobbyRosterGrid } from "../components/LobbyRosterGrid";
 import { RaceCanvas } from "../components/RaceCanvas";
 import { useSessionSocket } from "../hooks/useSessionSocket";
 import { buildSessionSocketUrl, endSession, startSession } from "../lib/api";
@@ -28,6 +30,7 @@ export function HostPage() {
   const [phase, setPhase] = useState("lobby");
   const [remainingMs, setRemainingMs] = useState(0);
   const [result, setResult] = useState<MatchFinishedEvent | null>(null);
+  const [summary, setSummary] = useState<GameSessionSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const socketUrl = useMemo(() => (hostToken ? buildSessionSocketUrl(code, hostToken) : null), [code, hostToken]);
@@ -38,6 +41,7 @@ export function HostPage() {
       switch (event.type) {
         case "join_ack":
           setPhase(event.phase);
+          setSummary(event.summary);
           break;
         case "roster_update":
           setRoster(event.players);
@@ -83,10 +87,33 @@ export function HostPage() {
       r: player.rank
     }));
 
+  const joinLabel = typeof window !== "undefined" ? `${window.location.host}/join` : "/join";
+  const canStart = roster.length >= 2;
+
+  if (phase === "lobby") {
+    return (
+      <div className="grid gap-6 xl:grid-cols-[1.12fr_0.88fr]">
+        <HostLobbyStage
+          code={code}
+          playerCount={roster.length}
+          playerLimit={summary?.config.playerLimit}
+          minimumPlayers={2}
+          canStart={canStart}
+          joiningLabel={joinLabel}
+          onStart={() => startSession(code, hostToken).catch((startError) => setError(startError instanceof Error ? startError.message : "Unable to start match."))}
+          error={error}
+          statusText={error ? undefined : `Socket ${status}. Start as soon as at least 2 players are ready.`}
+          startDisabled={!canStart}
+        />
+        <LobbyRosterGrid players={roster} />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <section className="grid gap-6 xl:grid-cols-[1.4fr_0.6fr]">
-        <div className="rounded-[2rem] border border-white/10 bg-white/5 p-6 backdrop-blur">
+        <div className="cp-card-dark p-6">
           <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-sm uppercase tracking-[0.35em] text-cyan-200/80">Host Screen</p>
@@ -95,20 +122,20 @@ export function HostPage() {
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
-              <div className="rounded-full border border-white/10 bg-slate-950/60 px-4 py-2 text-sm text-slate-300">
+              <div className="rounded-full border border-white/10 bg-white/[0.08] px-4 py-2 text-sm text-slate-300">
                 Remaining {formatRemainingLabel(phase, remainingMs)}
               </div>
               <button
                 onClick={() => startSession(code, hostToken).catch((startError) => setError(startError instanceof Error ? startError.message : "Unable to start match."))}
                 disabled={phase !== "lobby" || roster.length < 2}
-                className="rounded-full bg-cyan-400 px-5 py-3 text-sm font-semibold text-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
+                className="cp-button-primary px-5 py-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Start race
               </button>
               <button
                 onClick={() => endSession(code, hostToken).catch((endError) => setError(endError instanceof Error ? endError.message : "Unable to end match."))}
                 disabled={phase !== "live" && phase !== "countdown"}
-                className="rounded-full border border-white/10 bg-white/10 px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                className="cp-button-secondary px-5 py-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Stop
               </button>
@@ -125,7 +152,7 @@ export function HostPage() {
               </div>
               <button
                 onClick={() => navigate(`/results/${result.matchId}`)}
-                className="mt-4 rounded-full border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-white"
+                className="cp-button-secondary mt-4 px-4 py-2 text-sm"
               >
                 Open results
               </button>

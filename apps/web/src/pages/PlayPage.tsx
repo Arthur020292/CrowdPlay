@@ -1,9 +1,10 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { useParams } from "react-router-dom";
 
 import { PLAYER_COLOR_PRESETS, PROTOCOL_VERSION, getDefaultPlayerColor, getPlayerColorHex, type MatchFinishedEvent, type PlayerColorId, type SnapshotEvent } from "@crowdplay/protocol";
 
-import { ColorPresetPicker } from "../components/ColorPresetPicker";
+import { PlayerIdentityPanel } from "../components/PlayerIdentityPanel";
 import { useSessionSocket } from "../hooks/useSessionSocket";
 import { buildSessionSocketUrl, joinSession } from "../lib/api";
 import { getPlayerSession, savePlayerSession } from "../lib/storage";
@@ -113,46 +114,42 @@ export function PlayPage() {
 
   if (!playerToken) {
     return (
-      <div className="mx-auto max-w-xl rounded-[2rem] border border-white/10 bg-white/5 p-8 backdrop-blur">
-        <p className="text-sm uppercase tracking-[0.35em] text-cyan-200/80">Join TapDash</p>
-        <h1 className="mt-3 text-3xl font-black text-white">Session {code}</h1>
-        <p className="mt-3 text-slate-300">Enter your display name and get ready to tap on the host&apos;s countdown.</p>
-
-        <form onSubmit={handleJoin} className="mt-6 space-y-4">
-          <input
-            className="w-full rounded-[1.5rem] border border-white/10 bg-slate-950/80 px-4 py-4 text-lg text-white outline-none"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            placeholder="Your name"
-            maxLength={24}
-          />
-          <ColorPresetPicker selectedColor={color} onChange={setColor} />
-          {error ? <p className="text-sm text-rose-300">{error}</p> : null}
-          <button
-            disabled={!name.trim() || submitting}
-            className="inline-flex w-full items-center justify-center rounded-[1.5rem] bg-cyan-400 px-4 py-4 font-semibold text-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {submitting ? "Joining..." : "Join game"}
-          </button>
-        </form>
+      <div className="space-y-4 py-4 sm:py-10">
+        <PlayerIdentityPanel
+          code={code}
+          name={name}
+          color={color}
+          onNameChange={setName}
+          onColorChange={setColor}
+          onSubmit={handleJoin}
+          ctaLabel="Enter game"
+          error={error}
+          submitting={submitting}
+        />
+        <div className="text-center text-sm font-medium text-slate-300">
+          Wrong room?{" "}
+          <Link className="font-semibold text-cyan-200 underline decoration-cyan-400/50 underline-offset-4" to="/join">
+            Enter a different code
+          </Link>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="mx-auto flex max-w-xl flex-col gap-6">
-      <section className="rounded-[2rem] border border-white/10 bg-white/5 p-6 text-center backdrop-blur">
+      <section className="cp-card-dark p-6 text-center">
         <p className="text-sm uppercase tracking-[0.35em] text-cyan-200/80">Phone Controller</p>
         <h1 className="mt-3 text-4xl font-black text-white">{name || "Player"}</h1>
         <p className="mt-2 text-sm text-slate-400">
           Session {code} • Socket {status} • Phase {phase}
         </p>
-        <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-slate-950/70 px-3 py-2 text-sm text-slate-200">
+        <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.08] px-3 py-2 text-sm text-slate-200">
           <span className="inline-block size-3 rounded-full" style={{ backgroundColor: getPlayerColorHex(me?.color ?? color) }} />
           {PLAYER_COLOR_PRESETS.find((preset) => preset.id === color)?.label ?? "Color"}
         </div>
 
-        <div className="mt-6 rounded-[1.5rem] border border-white/10 bg-slate-950/80 p-4">
+        <div className="mt-6 rounded-[1.5rem] border border-white/10 bg-white/[0.07] p-4">
           <div className="flex items-center justify-between text-sm text-slate-300">
             <span>Rank</span>
             <span className="text-lg font-semibold text-white">{me?.r ?? "-"}</span>
@@ -177,7 +174,7 @@ export function PlayPage() {
             }
           }}
           disabled={phase !== "live"}
-          className="mt-6 inline-flex min-h-56 w-full items-center justify-center rounded-[2rem] bg-gradient-to-br from-cyan-300 to-blue-500 px-4 py-10 text-4xl font-black uppercase tracking-[0.2em] text-slate-950 shadow-2xl shadow-cyan-500/30 transition active:scale-[0.98] disabled:cursor-not-allowed disabled:from-slate-700 disabled:to-slate-800 disabled:text-slate-400 disabled:shadow-none"
+          className="mt-6 inline-flex min-h-56 w-full items-center justify-center rounded-[2.4rem] bg-gradient-to-br from-cyan-200 via-sky-300 to-blue-500 px-4 py-10 text-4xl font-black uppercase tracking-[0.2em] text-slate-950 shadow-2xl shadow-cyan-500/30 transition active:scale-[0.98] disabled:cursor-not-allowed disabled:from-slate-700 disabled:via-slate-800 disabled:to-slate-900 disabled:text-slate-400 disabled:shadow-none"
         >
           {phase === "live" ? "Tap" : phase === "countdown" ? "Ready" : phase === "finished" ? "Finished" : "Waiting"}
         </button>
@@ -186,7 +183,7 @@ export function PlayPage() {
       </section>
 
       {result ? (
-        <section className="rounded-[2rem] border border-amber-300/20 bg-amber-400/10 p-6">
+        <section className="cp-card-dark border-amber-300/20 bg-[linear-gradient(180deg,rgba(120,53,15,0.28),rgba(8,18,37,0.84))] p-6">
           <p className="text-sm uppercase tracking-[0.35em] text-amber-200/80">Match complete</p>
           <h2 className="mt-2 text-2xl font-black text-white">Top finishers</h2>
           <div className="mt-4 space-y-2">
