@@ -1,6 +1,6 @@
-import { getPlayerColorHex } from "@crowdplay/protocol";
-
 import type { MatchStanding, RosterPlayer, SnapshotPlayer } from "@crowdplay/protocol";
+
+import { AvatarBadge } from "./AvatarBadge";
 
 type Row = MatchStanding | RosterPlayer | SnapshotPlayer;
 
@@ -23,16 +23,15 @@ export function Leaderboard({ players, title }: LeaderboardProps) {
             key={"playerId" in player ? player.playerId : player.id}
             className="flex items-center justify-between rounded-[1.4rem] border border-slate-200 bg-white/[0.84] px-4 py-3 shadow-[0_8px_20px_rgba(148,163,184,0.12)]"
           >
-            <div>
-              <div className="text-sm font-semibold text-slate-950">
-                <span
-                  className="mr-2 inline-block size-3 rounded-full align-middle shadow-[0_0_0_4px_rgba(255,255,255,0.08)]"
-                  style={{ backgroundColor: "color" in player ? getPlayerColorHex(player.color) : "#22d3ee" }}
-                />
-                {index + 1}. {player.name}
-              </div>
-              <div className="text-xs text-slate-500">
-                {"connected" in player ? (player.connected ? "Connected" : "Reconnecting") : `${"totalTaps" in player ? player.totalTaps : player.t} taps`}
+            <div className="flex items-center gap-3">
+              <AvatarBadge avatarId={player.avatarId} size={40} />
+              <div>
+                <div className="text-sm font-semibold text-slate-950">
+                  {index + 1}. {player.name}
+                </div>
+                <div className="text-xs text-slate-500">
+                  {"connected" in player ? (player.connected ? "Connected" : "Reconnecting") : `${"totalTaps" in player ? player.totalTaps : player.t} taps`}
+                </div>
               </div>
             </div>
 

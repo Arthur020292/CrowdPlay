@@ -2,7 +2,7 @@ import {
   type MatchFinishedEvent,
   type MatchResult,
   type MatchStanding,
-  type PlayerColorId,
+  type PlayerAvatarId,
   type RosterPlayer,
   type SnapshotEvent,
   type SnapshotPlayer,
@@ -14,23 +14,23 @@ const FIXTURE_TIME = Date.UTC(2026, 3, 2, 7, 30, 0);
 interface PlayerSeed {
   id: string;
   name: string;
-  color: PlayerColorId;
+  avatarId: PlayerAvatarId;
 }
 
 const playerSeeds: PlayerSeed[] = [
-  { id: "p_ava", name: "Ava", color: "cyan" },
-  { id: "p_liam", name: "Liam", color: "amber" },
-  { id: "p_mia", name: "Mia", color: "rose" },
-  { id: "p_noah", name: "Noah", color: "lime" },
-  { id: "p_zoe", name: "Zoe", color: "violet" },
-  { id: "p_leo", name: "Leo", color: "pink" }
+  { id: "p_ava", name: "Ava", avatarId: "fox" },
+  { id: "p_liam", name: "Liam", avatarId: "panda" },
+  { id: "p_mia", name: "Mia", avatarId: "tiger" },
+  { id: "p_noah", name: "Noah", avatarId: "frog" },
+  { id: "p_zoe", name: "Zoe", avatarId: "owl" },
+  { id: "p_leo", name: "Leo", avatarId: "shark" }
 ];
 
 function makeRosterPlayer(seed: PlayerSeed, index: number, overrides: Partial<RosterPlayer> = {}): RosterPlayer {
   return {
     id: seed.id,
     name: seed.name,
-    color: seed.color,
+    avatarId: seed.avatarId,
     connected: true,
     rank: index + 1,
     distance: 0,
@@ -42,7 +42,7 @@ function makeSnapshotPlayer(seed: PlayerSeed, index: number, distance: number, t
   return {
     id: seed.id,
     name: seed.name,
-    color: seed.color,
+    avatarId: seed.avatarId,
     d: distance,
     r: index + 1,
     t: taps,
@@ -55,7 +55,7 @@ function toStandings(players: SnapshotPlayer[]): MatchStanding[] {
   return players.map((player, index) => ({
     playerId: player.id,
     name: player.name,
-    color: player.color,
+    avatarId: player.avatarId,
     rank: index + 1,
     distance: player.d,
     totalTaps: player.t

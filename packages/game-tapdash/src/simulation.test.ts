@@ -8,7 +8,7 @@ function createPlayer(playerId: string, name: string): SessionPlayer {
   return {
     playerId,
     name,
-    color: "cyan",
+    avatarId: "fox",
     joinedAt: Date.now(),
     connected: true,
     lastSeenAt: Date.now(),

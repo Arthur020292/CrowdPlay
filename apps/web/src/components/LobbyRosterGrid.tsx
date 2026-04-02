@@ -1,4 +1,6 @@
-import { getPlayerColorHex, type RosterPlayer } from "@crowdplay/protocol";
+import type { RosterPlayer } from "@crowdplay/protocol";
+
+import { AvatarBadge } from "./AvatarBadge";
 
 interface LobbyRosterGridProps {
   players: RosterPlayer[];
@@ -20,7 +22,7 @@ export function LobbyRosterGrid({ players }: LobbyRosterGridProps) {
           players.map((player) => (
             <div key={player.id} className="rounded-[1.35rem] border border-white/75 bg-white/[0.72] px-4 py-4 shadow-[0_8px_20px_rgba(148,163,184,0.10)] backdrop-blur">
               <div className="flex items-start gap-3">
-                <span className="mt-1 inline-block size-4 rounded-full shadow-[0_0_0_4px_rgba(255,255,255,0.8)]" style={{ backgroundColor: getPlayerColorHex(player.color) }} />
+                <AvatarBadge avatarId={player.avatarId} size={44} />
                 <div className="min-w-0">
                   <div className="truncate text-base font-semibold text-slate-950">{player.name}</div>
                   <div className="mt-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">

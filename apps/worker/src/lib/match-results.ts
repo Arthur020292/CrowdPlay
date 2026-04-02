@@ -1,4 +1,4 @@
-import type { MatchResult } from "@crowdplay/protocol";
+import { coercePlayerAvatarId, type MatchResult } from "@crowdplay/protocol";
 
 export async function persistMatchResult(database: D1Database, result: MatchResult): Promise<void> {
   await database
@@ -55,7 +55,10 @@ export async function readMatchResult(database: D1Database, matchId: string): Pr
     durationMs: Number(row.duration_ms),
     playerCount: Number(row.player_count),
     winners: JSON.parse(String(row.winner_ids_json)) as string[],
-    standings: JSON.parse(String(row.standings_json)),
+    standings: (JSON.parse(String(row.standings_json)) as Array<Record<string, unknown>>).map((standing, index) => ({
+      ...standing,
+      avatarId: coercePlayerAvatarId(standing.avatarId ?? standing.color, index)
+    })) as MatchResult["standings"],
     stats: JSON.parse(String(row.stats_json))
   };
 }
