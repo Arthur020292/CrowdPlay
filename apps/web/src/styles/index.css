@@ -27,10 +27,26 @@ body {
   margin: 0;
   min-width: 320px;
   background:
-    radial-gradient(circle at top left, rgba(56, 189, 248, 0.34), transparent 28%),
-    radial-gradient(circle at top right, rgba(245, 158, 11, 0.2), transparent 24%),
-    radial-gradient(circle at bottom left, rgba(132, 204, 22, 0.18), transparent 24%),
-    linear-gradient(180deg, #0b1730 0%, #081225 52%, #030712 100%);
+    radial-gradient(circle at 12% 10%, rgba(56, 189, 248, 0.22), transparent 24%),
+    radial-gradient(circle at 86% 14%, rgba(250, 204, 21, 0.18), transparent 20%),
+    radial-gradient(circle at 16% 82%, rgba(132, 204, 22, 0.14), transparent 18%),
+    radial-gradient(circle at 82% 76%, rgba(244, 114, 182, 0.12), transparent 18%),
+    radial-gradient(circle, rgba(148, 163, 184, 0.16) 1.6px, transparent 1.8px),
+    linear-gradient(180deg, #f8fcff 0%, #eef7ff 52%, #e7f1ff 100%);
+  background-size:
+    auto,
+    auto,
+    auto,
+    auto,
+    28px 28px,
+    auto;
+  background-position:
+    top left,
+    top right,
+    bottom left,
+    bottom right,
+    0 0,
+    center;
   color: #e2e8f0;
 }
 
