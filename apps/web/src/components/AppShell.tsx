@@ -1,6 +1,19 @@
-import { Link, Outlet } from "react-router-dom";
+import { Link, Outlet, useLocation } from "react-router-dom";
 
 export function AppShell() {
+  const location = useLocation();
+  const isHostRoute = location.pathname.startsWith("/host/");
+
+  if (isHostRoute) {
+    return (
+      <div className="min-h-screen text-slate-100">
+        <main className="min-h-screen">
+          <Outlet />
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen text-slate-100">
       <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-4 py-6 sm:px-6 lg:px-8">
