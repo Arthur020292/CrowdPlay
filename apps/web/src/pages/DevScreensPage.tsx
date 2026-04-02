@@ -43,8 +43,7 @@ function LandingPreview() {
   return (
     <div className="flex min-h-[32rem] items-center justify-center">
       <section className="w-full max-w-4xl px-8 py-12 text-center sm:px-12 sm:py-16">
-        <span className="cp-eyebrow cp-eyebrow-light">TapDash</span>
-        <h1 className="mx-auto mt-6 max-w-3xl text-4xl font-black tracking-tight text-slate-900 sm:text-6xl">Choose how you want to play.</h1>
+        <h1 className="mx-auto max-w-3xl text-4xl font-black tracking-tight text-slate-900 sm:text-6xl">Choose how you want to play.</h1>
         <p className="mx-auto mt-4 max-w-2xl text-lg text-slate-600">
           Host a game on the big screen or join one from your phone. That&apos;s it.
         </p>
@@ -60,7 +59,7 @@ function LandingPreview() {
 
 function HostGamesPreview() {
   return (
-    <div className="cp-card-panel p-8 sm:p-10">
+    <div>
       <span className="cp-eyebrow cp-eyebrow-light">Choose a game</span>
       <h1 className="mt-5 text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">Pick what the room will play.</h1>
       <p className="mt-3 max-w-2xl text-base text-slate-600 sm:text-lg">
@@ -71,24 +70,19 @@ function HostGamesPreview() {
         {Array.from({ length: 10 }, (_, index) => {
           const isLive = index === 0;
           return (
-            <div
-              key={index}
-              className={`rounded-[1.7rem] border p-5 text-left ${
-                isLive ? "border-sky-200 bg-white/[0.94] shadow-[0_18px_34px_rgba(56,189,248,0.12)]" : "border-slate-200 bg-white/[0.68] opacity-80"
-              }`}
-            >
+            <div key={index} className={`rounded-[1.9rem] border p-5 text-left ${isLive ? "border-sky-200/90 bg-white/[0.76] shadow-[0_20px_40px_rgba(56,189,248,0.10)] backdrop-blur-[10px]" : "border-slate-200/80 bg-white/[0.54] backdrop-blur-[10px]"}`}>
               <div className="flex items-center justify-between gap-3">
-                <span className={`rounded-full px-3 py-1 text-xs font-black uppercase tracking-[0.26em] ${isLive ? "bg-cyan-100 text-cyan-700" : "bg-slate-200 text-slate-500"}`}>
+                <span className={`rounded-full px-3 py-1 text-xs font-black uppercase tracking-[0.26em] ${isLive ? "bg-cyan-100/90 text-cyan-700" : "bg-slate-200/90 text-slate-500"}`}>
                   {isLive ? "Live" : "Coming soon"}
                 </span>
-                <span className={`inline-flex size-11 items-center justify-center rounded-[1rem] border-4 text-lg font-black ${isLive ? "border-sky-300 bg-gradient-to-b from-cyan-200 to-sky-400 text-sky-900" : "border-slate-300 bg-slate-100 text-slate-400"}`}>
+                <span className={`inline-flex size-11 items-center justify-center rounded-[1rem] border-4 text-lg font-black ${isLive ? "border-sky-300 bg-gradient-to-b from-cyan-200 to-sky-400 text-sky-900" : "border-slate-300 bg-white/[0.78] text-slate-400"}`}>
                   {isLive ? "TD" : "?"}
                 </span>
               </div>
               <div className="mt-5 text-2xl font-black text-slate-950">{isLive ? "TapDash" : "Coming soon"}</div>
               <p className="mt-2 text-sm leading-6 text-slate-600">{isLive ? "Rapid tapping race for a shared screen." : "More CrowdPlay party games are on the way."}</p>
               <div className="mt-5">
-                <span className={isLive ? "cp-button-primary min-h-[3.8rem] min-w-[10rem] text-base font-black" : "inline-flex min-h-[3.8rem] min-w-[10rem] items-center justify-center rounded-[1.3rem] border border-slate-200 bg-white/[0.7] px-4 py-3 text-sm font-black uppercase tracking-[0.18em] text-slate-400"}>
+                <span className={isLive ? "cp-button-primary min-h-[3.8rem] min-w-[10rem] text-base font-black" : "inline-flex min-h-[3.8rem] min-w-[10rem] items-center justify-center rounded-[1.3rem] border border-slate-200/80 bg-white/[0.58] px-4 py-3 text-sm font-black uppercase tracking-[0.18em] text-slate-400"}>
                   {isLive ? "Play TapDash" : "Soon"}
                 </span>
               </div>
