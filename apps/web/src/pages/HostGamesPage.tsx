@@ -44,8 +44,8 @@ export function HostGamesPage() {
   };
 
   return (
-    <div className="min-h-screen px-4 py-6 sm:px-6 lg:px-8">
-      <section className="cp-card-panel p-8 sm:p-10">
+    <main className="min-h-screen px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
+      <section>
         <span className="cp-eyebrow cp-eyebrow-light">Choose a game</span>
         <h1 className="mt-5 text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">Pick what the room will play.</h1>
         <p className="mt-3 max-w-2xl text-base text-slate-600 sm:text-lg">
@@ -64,17 +64,17 @@ export function HostGamesPage() {
                 type="button"
                 disabled={!isLive || busy}
                 onClick={isLive ? handlePickTapDash : undefined}
-                className={`rounded-[1.7rem] border p-5 text-left transition ${
+                className={`rounded-[1.9rem] border p-5 text-left transition ${
                   isLive
-                    ? "border-sky-200 bg-white/[0.94] shadow-[0_18px_34px_rgba(56,189,248,0.12)] hover:-translate-y-1"
-                    : "cursor-not-allowed border-slate-200 bg-white/[0.68] opacity-80"
+                    ? "border-sky-200/90 bg-white/[0.76] shadow-[0_20px_40px_rgba(56,189,248,0.10)] backdrop-blur-[10px] hover:-translate-y-1 hover:shadow-[0_24px_44px_rgba(56,189,248,0.14)]"
+                    : "cursor-not-allowed border-slate-200/80 bg-white/[0.54] backdrop-blur-[10px]"
                 }`}
               >
                 <div className="flex items-center justify-between gap-3">
-                  <span className={`rounded-full px-3 py-1 text-xs font-black uppercase tracking-[0.26em] ${isLive ? "bg-cyan-100 text-cyan-700" : "bg-slate-200 text-slate-500"}`}>
+                  <span className={`rounded-full px-3 py-1 text-xs font-black uppercase tracking-[0.26em] ${isLive ? "bg-cyan-100/90 text-cyan-700" : "bg-slate-200/90 text-slate-500"}`}>
                     {isLive ? "Live" : "Coming soon"}
                   </span>
-                  <span className={`inline-flex size-11 items-center justify-center rounded-[1rem] border-4 text-lg font-black ${isLive ? "border-sky-300 bg-gradient-to-b from-cyan-200 to-sky-400 text-sky-900" : "border-slate-300 bg-slate-100 text-slate-400"}`}>
+                  <span className={`inline-flex size-11 items-center justify-center rounded-[1rem] border-4 text-lg font-black ${isLive ? "border-sky-300 bg-gradient-to-b from-cyan-200 to-sky-400 text-sky-900" : "border-slate-300 bg-white/[0.78] text-slate-400"}`}>
                     {isLive ? "TD" : "?"}
                   </span>
                 </div>
@@ -86,7 +86,7 @@ export function HostGamesPage() {
                   {isLive ? (
                     <span className="cp-button-primary min-h-[3.8rem] min-w-[10rem] text-base font-black">{busy ? "Creating..." : "Play TapDash"}</span>
                   ) : (
-                    <span className="inline-flex min-h-[3.8rem] min-w-[10rem] items-center justify-center rounded-[1.3rem] border border-slate-200 bg-white/[0.7] px-4 py-3 text-sm font-black uppercase tracking-[0.18em] text-slate-400">
+                    <span className="inline-flex min-h-[3.8rem] min-w-[10rem] items-center justify-center rounded-[1.3rem] border border-slate-200/80 bg-white/[0.58] px-4 py-3 text-sm font-black uppercase tracking-[0.18em] text-slate-400">
                       Soon
                     </span>
                   )}
@@ -96,6 +96,6 @@ export function HostGamesPage() {
           })}
         </div>
       </section>
-    </div>
+    </main>
   );
 }
