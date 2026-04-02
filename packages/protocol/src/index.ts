@@ -3,20 +3,29 @@ import { z } from "zod";
 export const PROTOCOL_VERSION = 1;
 export const GAME_PHASES = ["lobby", "countdown", "live", "finished", "archived", "expired"] as const;
 export const PLAYER_STATUSES = ["connected", "disconnected", "finished", "kicked"] as const;
-export const PLAYER_COLOR_PRESETS = [
-  { id: "cyan", label: "Cyan", hex: "#22d3ee" },
-  { id: "amber", label: "Amber", hex: "#f59e0b" },
-  { id: "rose", label: "Rose", hex: "#fb7185" },
-  { id: "lime", label: "Lime", hex: "#a3e635" },
-  { id: "violet", label: "Violet", hex: "#818cf8" },
-  { id: "pink", label: "Pink", hex: "#f472b6" }
+export const PLAYER_AVATAR_PRESETS = [
+  { id: "fox", label: "Fox", accentHex: "#f59e0b", shadowHex: "#d97706" },
+  { id: "panda", label: "Panda", accentHex: "#38bdf8", shadowHex: "#0284c7" },
+  { id: "tiger", label: "Tiger", accentHex: "#fb7185", shadowHex: "#e11d48" },
+  { id: "frog", label: "Frog", accentHex: "#a3e635", shadowHex: "#65a30d" },
+  { id: "owl", label: "Owl", accentHex: "#818cf8", shadowHex: "#4f46e5" },
+  { id: "shark", label: "Shark", accentHex: "#22d3ee", shadowHex: "#0891b2" }
 ] as const;
+
+const LEGACY_COLOR_TO_AVATAR = {
+  cyan: "shark",
+  amber: "fox",
+  rose: "tiger",
+  lime: "frog",
+  violet: "owl",
+  pink: "panda"
+} as const;
 
 export type GamePhase = (typeof GAME_PHASES)[number];
 export type PlayerStatus = (typeof PLAYER_STATUSES)[number];
-export type PlayerColorId = (typeof PLAYER_COLOR_PRESETS)[number]["id"];
+export type PlayerAvatarId = (typeof PLAYER_AVATAR_PRESETS)[number]["id"];
 
-export const playerColorIdSchema = z.enum(PLAYER_COLOR_PRESETS.map((preset) => preset.id) as [PlayerColorId, ...PlayerColorId[]]);
+export const playerAvatarIdSchema = z.enum(PLAYER_AVATAR_PRESETS.map((preset) => preset.id) as [PlayerAvatarId, ...PlayerAvatarId[]]);
 
 export const sessionConfigSchema = z.object({
   gameType: z.literal("tapdash").default("tapdash"),
@@ -32,7 +41,7 @@ export type SessionConfig = z.infer<typeof sessionConfigSchema>;
 export interface SessionPlayer {
   playerId: string;
   name: string;
-  color: PlayerColorId;
+  avatarId: PlayerAvatarId;
   joinedAt: number;
   connected: boolean;
   lastSeenAt: number;
@@ -58,7 +67,7 @@ export interface GameSessionSummary {
 export interface MatchStanding {
   playerId: string;
   name: string;
-  color: PlayerColorId;
+  avatarId: PlayerAvatarId;
   rank: number;
   distance: number;
   totalTaps: number;
@@ -85,7 +94,7 @@ export interface MatchResult {
 export interface SnapshotPlayer {
   id: string;
   name: string;
-  color: PlayerColorId;
+  avatarId: PlayerAvatarId;
   d: number;
   r: number;
   t: number;
@@ -95,7 +104,7 @@ export interface SnapshotPlayer {
 export interface RosterPlayer {
   id: string;
   name: string;
-  color: PlayerColorId;
+  avatarId: PlayerAvatarId;
   connected: boolean;
   rank: number;
   distance: number;
@@ -109,7 +118,7 @@ export const createSessionRequestSchema = z.object({
 
 export const joinSessionRequestSchema = z.object({
   name: z.string().trim().min(1).max(24),
-  color: playerColorIdSchema
+  avatarId: playerAvatarIdSchema
 });
 
 export const createSessionResponseSchema = z.object({
@@ -251,12 +260,36 @@ export function parseClientEvent(payload: unknown): ClientEvent {
   return clientEventSchema.parse(payload);
 }
 
-export function getPlayerColorHex(colorId: PlayerColorId): string {
-  return PLAYER_COLOR_PRESETS.find((preset) => preset.id === colorId)?.hex ?? PLAYER_COLOR_PRESETS[0].hex;
+export function getPlayerAvatarPreset(avatarId: PlayerAvatarId) {
+  return PLAYER_AVATAR_PRESETS.find((preset) => preset.id === avatarId) ?? PLAYER_AVATAR_PRESETS[0];
 }
 
-export function getDefaultPlayerColor(index = 0): PlayerColorId {
-  return PLAYER_COLOR_PRESETS[index % PLAYER_COLOR_PRESETS.length].id;
+export function getPlayerAccentHex(avatarId: PlayerAvatarId): string {
+  return getPlayerAvatarPreset(avatarId).accentHex;
+}
+
+export function getPlayerShadowHex(avatarId: PlayerAvatarId): string {
+  return getPlayerAvatarPreset(avatarId).shadowHex;
+}
+
+export function getDefaultPlayerAvatar(index = 0): PlayerAvatarId {
+  return PLAYER_AVATAR_PRESETS[index % PLAYER_AVATAR_PRESETS.length].id;
+}
+
+export function coercePlayerAvatarId(value: unknown, fallbackIndex = 0): PlayerAvatarId {
+  if (typeof value === "string") {
+    const avatarMatch = PLAYER_AVATAR_PRESETS.find((preset) => preset.id === value);
+    if (avatarMatch) {
+      return avatarMatch.id;
+    }
+
+    const legacyAvatar = LEGACY_COLOR_TO_AVATAR[value as keyof typeof LEGACY_COLOR_TO_AVATAR];
+    if (legacyAvatar) {
+      return legacyAvatar;
+    }
+  }
+
+  return getDefaultPlayerAvatar(fallbackIndex);
 }
 
 export function safeParseServerEvent(payload: unknown): ServerEvent | null {

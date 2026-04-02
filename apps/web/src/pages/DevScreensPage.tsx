@@ -1,7 +1,8 @@
 import { FormEvent, useState } from "react";
 
-import { PLAYER_COLOR_PRESETS, getPlayerColorHex, type PlayerColorId, type SnapshotEvent } from "@crowdplay/protocol";
+import { getPlayerAccentHex, getPlayerAvatarPreset, type PlayerAvatarId, type SnapshotEvent } from "@crowdplay/protocol";
 
+import { AvatarBadge } from "../components/AvatarBadge";
 import { HostLobbyStage } from "../components/HostLobbyStage";
 import { JoinCodePanel } from "../components/JoinCodePanel";
 import { Leaderboard } from "../components/Leaderboard";
@@ -163,9 +164,9 @@ function PlayerLivePreview({ snapshot, phase, remainingMs }: { snapshot: Snapsho
         <p className="text-sm uppercase tracking-[0.35em] text-cyan-200/80">Phone Controller</p>
         <h1 className="mt-3 text-4xl font-black text-white">{me.name}</h1>
         <p className="mt-2 text-sm text-slate-400">Session DEMO5 • Socket open • Phase {phase}</p>
-        <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.08] px-3 py-2 text-sm text-slate-200">
-          <span className="inline-block size-3 rounded-full" style={{ backgroundColor: getPlayerColorHex(me.color) }} />
-          {PLAYER_COLOR_PRESETS.find((preset) => preset.id === me.color)?.label ?? "Color"}
+        <div className="mt-4 inline-flex items-center gap-3 rounded-full border border-white/10 bg-white/[0.08] px-3 py-2 text-sm text-slate-200">
+          <AvatarBadge avatarId={me.avatarId} size={40} />
+          {getPlayerAvatarPreset(me.avatarId).label}
         </div>
 
         <div className="mt-6 rounded-[1.5rem] border border-white/10 bg-white/[0.07] p-4">
@@ -175,14 +176,14 @@ function PlayerLivePreview({ snapshot, phase, remainingMs }: { snapshot: Snapsho
           </div>
           <div className="mt-3 flex items-center justify-between text-sm text-slate-300">
             <span>Distance</span>
-            <span className="text-lg font-semibold text-cyan-200">{me.d.toFixed(1)}m</span>
+            <span className="text-lg font-semibold" style={{ color: getPlayerAccentHex(me.avatarId) }}>{me.d.toFixed(1)}m</span>
           </div>
           <div className="mt-3 flex items-center justify-between text-sm text-slate-300">
             <span>Remaining</span>
             <span className="text-lg font-semibold text-white">{formatRemainingLabel(phase, remainingMs)}</span>
           </div>
           <div className="mt-4 h-3 overflow-hidden rounded-full bg-white/10">
-            <div className="h-full rounded-full bg-cyan-400 transition-all" style={{ width: `${progress}%` }} />
+            <div className="h-full rounded-full transition-all" style={{ width: `${progress}%`, backgroundColor: getPlayerAccentHex(me.avatarId) }} />
           </div>
         </div>
 
@@ -252,7 +253,7 @@ function ResultsPreviewCard() {
 export function DevScreensPage() {
   const [joinCode, setJoinCode] = useState("DEMO5");
   const [name, setName] = useState("Ava");
-  const [color, setColor] = useState<PlayerColorId>("cyan");
+  const [avatarId, setAvatarId] = useState<PlayerAvatarId>("fox");
 
   const noopSubmit = (event: FormEvent<HTMLFormElement>) => event.preventDefault();
 
@@ -274,17 +275,17 @@ export function DevScreensPage() {
         <HostGamesPreview />
       </DevSection>
 
-      <DevSection title="Join code" description="Single-purpose code entry before name and color.">
+      <DevSection title="Join code" description="Single-purpose code entry before name and avatar selection.">
         <JoinCodePanel code={joinCode} onCodeChange={setJoinCode} onSubmit={noopSubmit} />
       </DevSection>
 
-      <DevSection title="Player identity" description="Friendly name-and-color step after the code is entered.">
+      <DevSection title="Player identity" description="Friendly name-and-avatar step after the code is entered.">
         <PlayerIdentityPanel
           code="DEMO5"
           name={name}
-          color={color}
+          avatarId={avatarId}
           onNameChange={setName}
-          onColorChange={setColor}
+          onAvatarChange={setAvatarId}
           onSubmit={noopSubmit}
           ctaLabel="Enter game"
         />

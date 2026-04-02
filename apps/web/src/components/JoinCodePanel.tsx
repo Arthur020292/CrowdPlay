@@ -11,7 +11,7 @@ export function JoinCodePanel({ code, onCodeChange, onSubmit }: JoinCodePanelPro
     <div className="cp-card-light mx-auto max-w-xl p-8 sm:p-10">
       <span className="cp-eyebrow cp-eyebrow-light">Join game</span>
       <h1 className="mt-5 text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">Enter the code</h1>
-      <p className="mt-3 text-base text-slate-600 sm:text-lg">Type the code from the host screen. You&apos;ll pick your name and color next.</p>
+      <p className="mt-3 text-base text-slate-600 sm:text-lg">Type the code from the host screen. You&apos;ll pick your name and avatar next.</p>
 
       <form onSubmit={onSubmit} className="mt-8 space-y-5">
         <input

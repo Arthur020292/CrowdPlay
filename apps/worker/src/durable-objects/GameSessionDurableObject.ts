@@ -3,12 +3,11 @@ import { DurableObject } from "cloudflare:workers";
 import { acceptTapBatch, buildStandings, stepRace } from "@crowdplay/game-tapdash";
 import {
   PROTOCOL_VERSION,
+  coercePlayerAvatarId,
   defaultSessionConfig,
-  getDefaultPlayerColor,
   parseClientEvent,
   type GamePhase,
   type MatchResult,
-  type PlayerColorId,
   type RosterPlayer,
   type ServerEvent,
   type SessionConfig,
@@ -206,13 +205,21 @@ export class GameSessionDurableObject extends DurableObject<Env> {
     this.liveEndsAt = persisted.liveEndsAt;
     this.tick = persisted.tick;
     this.config = persisted.config;
-    this.lastResult = persisted.lastResult;
+    this.lastResult = persisted.lastResult
+      ? {
+          ...persisted.lastResult,
+          standings: persisted.lastResult.standings.map((standing, index) => ({
+            ...standing,
+            avatarId: coercePlayerAvatarId(standing.avatarId ?? (standing as { color?: string }).color, index)
+          }))
+        }
+      : null;
     this.players = new Map(
-      persisted.players.map((player: PersistedSessionState["players"][number]) => [
+      persisted.players.map((player: PersistedSessionState["players"][number], index) => [
         player.playerId,
         {
           ...player,
-          color: player.color ?? getDefaultPlayerColor(),
+          avatarId: coercePlayerAvatarId(player.avatarId ?? (player as { color?: string }).color, index),
           status: player.connected ? "connected" : player.status
         }
       ])
@@ -288,13 +295,13 @@ export class GameSessionDurableObject extends DurableObject<Env> {
       return Response.json({ error: { code: "SESSION_FULL", message: "Player limit reached." } }, { status: 409 });
     }
 
-    const payload = (await request.json()) as { name: string; color: PlayerColorId; playerId: string };
+    const payload = (await request.json()) as { name: string; avatarId?: string; color?: string; playerId: string };
     const now = Date.now();
 
     const player: SessionPlayer = {
       playerId: payload.playerId,
       name: payload.name.trim(),
-      color: payload.color,
+      avatarId: coercePlayerAvatarId(payload.avatarId ?? payload.color, this.players.size),
       joinedAt: now,
       connected: false,
       lastSeenAt: now,
@@ -532,7 +539,7 @@ export class GameSessionDurableObject extends DurableObject<Env> {
       .map((player) => ({
         id: player.playerId,
         name: player.name,
-        color: player.color,
+        avatarId: player.avatarId,
         d: Math.round(player.distance * 100) / 100,
         r: player.rank,
         t: player.totalTaps,
@@ -559,7 +566,7 @@ export class GameSessionDurableObject extends DurableObject<Env> {
       .map((player) => ({
         id: player.playerId,
         name: player.name,
-        color: player.color,
+        avatarId: player.avatarId,
         connected: player.connected,
         rank: player.rank,
         distance: Math.round(player.distance * 100) / 100

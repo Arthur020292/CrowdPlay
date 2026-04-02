@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 
-import { getPlayerColorHex } from "@crowdplay/protocol";
+import { getPlayerAccentHex } from "@crowdplay/protocol";
 
 import type { SnapshotEvent } from "@crowdplay/protocol";
 
@@ -66,7 +66,7 @@ export function RaceCanvas({ snapshot, previousSnapshot }: RaceCanvasProps) {
         const blendedDistance = previous ? previous.d + (player.d - previous.d) * alpha : player.d;
         const y = laneHeight * index + laneHeight / 2;
         const x = 24 * devicePixelRatio + (blendedDistance / maxDistance) * (widthPx - 80 * devicePixelRatio);
-        const color = getPlayerColorHex(player.color);
+        const color = getPlayerAccentHex(player.avatarId);
 
         context.strokeStyle = "rgba(255,255,255,0.1)";
         context.lineWidth = 2 * devicePixelRatio;
