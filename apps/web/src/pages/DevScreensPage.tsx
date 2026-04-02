@@ -301,15 +301,17 @@ export function DevScreensPage() {
         </div>
       </DevSection>
 
-      <DevSection title="Host countdown" description="Shared screen during the final countdown before input starts counting.">
-        <HostRacePreview
-          code="DEMO5"
-          phase="countdown"
-          remainingMs={previewCountdownSnapshot.remainingMs}
-          players={previewCountdownSnapshot.players}
-          snapshot={previewCountdownSnapshot}
-          previousSnapshot={previewCountdownSnapshot}
-        />
+      <DevSection title="Host countdown" description="Countdown stays in the lobby, then switches to the race screen once it ends.">
+        <div className="space-y-6">
+          <HostLobbyStage
+            code="DEMO5"
+            gameLabel="TapDash"
+            phase="countdown"
+            remainingMs={previewCountdownSnapshot.remainingMs}
+            playerCount={previewRoster.length}
+          />
+          <LobbyRosterGrid players={previewRoster} />
+        </div>
       </DevSection>
 
       <DevSection title="Host live race" description="Mid-race state with active standings, motion interpolation, and leaderboard updates.">

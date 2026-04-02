@@ -85,16 +85,20 @@ export function HostPage() {
       r: player.rank
     }));
 
-  if (phase === "lobby") {
+  if (phase === "lobby" || phase === "countdown") {
     return (
       <div className="min-h-screen space-y-6 px-4 py-6 sm:px-6 lg:px-8">
         <HostLobbyStage
           code={code}
           gameLabel="TapDash"
+          phase={phase === "countdown" ? "countdown" : "lobby"}
+          remainingMs={remainingMs}
+          playerCount={roster.length}
           onStart={() => startSession(code, hostToken).catch((startError) => setError(startError instanceof Error ? startError.message : "Unable to start match."))}
-          startDisabled={roster.length < 2}
+          startDisabled={roster.length < 2 || phase !== "lobby"}
         />
         <LobbyRosterGrid players={roster} />
+        {error ? <p className="px-6 text-sm text-rose-600">{error}</p> : null}
       </div>
     );
   }
