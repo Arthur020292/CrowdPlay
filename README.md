@@ -28,3 +28,7 @@ running on your machine.
 - `DB`: D1 binding for match history
 - `GAME_SESSIONS`: Durable Object namespace
 - `ASSETS`: static asset binding for the built frontend
+
+## Release Workflow
+
+- See [docs/release-process.md](/Users/arthur/Project/CrowdPlay/docs/release-process.md) for the feature branch, promotion, and production deploy checklist.
