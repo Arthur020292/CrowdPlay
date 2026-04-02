@@ -143,23 +143,21 @@ input {
 }
 
 .cp-button-primary {
-  border-color: #1988b5;
+  border-color: #4fb1d3;
   border-top-left-radius: 1.2rem 1.45rem;
   border-top-right-radius: 1.65rem 1.45rem;
   border-bottom-right-radius: 1.3rem 1.5rem;
   border-bottom-left-radius: 1.7rem 1.35rem;
   background:
-    radial-gradient(circle at 28% 22%, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 28%),
-    linear-gradient(166deg, rgba(255, 255, 255, 0.2) 0 34%, rgba(255, 255, 255, 0) 35%),
-    linear-gradient(180deg, #74eaff 0 48%, #58d7f9 49% 58%, #33bae6 59% 74%, #22a5d3 75% 100%);
-  color: #0a4162;
+    linear-gradient(165deg, rgba(255, 255, 255, 0.28) 0 32%, rgba(255, 255, 255, 0) 33%),
+    linear-gradient(180deg, #9be9ff 0 36%, #7adbf5 37% 56%, #52c5e7 57% 73%, #2fa9d3 74% 100%);
+  color: #0d4566;
   font-weight: 800;
   padding: 0.92rem 1.45rem 1.08rem;
   box-shadow:
-    0 8px 0 #0d759f,
-    0 12px 0 #095f83,
-    0 18px 28px rgba(14, 165, 233, 0.22),
-    inset 0 -10px 0 rgba(5, 72, 103, 0.18);
+    0 8px 0 #167ca7,
+    0 14px 22px rgba(24, 103, 142, 0.18),
+    inset 0 -14px 0 rgba(14, 118, 162, 0.26);
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.28);
 }
 
@@ -167,30 +165,27 @@ input {
   transform: translateY(-1px) rotate(-0.4deg);
   filter: saturate(1.04);
   box-shadow:
-    0 9px 0 #0d759f,
-    0 13px 0 #095f83,
-    0 20px 30px rgba(14, 165, 233, 0.26),
-    inset 0 -10px 0 rgba(5, 72, 103, 0.18);
+    0 9px 0 #167ca7,
+    0 16px 24px rgba(24, 103, 142, 0.2),
+    inset 0 -14px 0 rgba(14, 118, 162, 0.26);
 }
 
 .cp-button-secondary {
-  border-color: #27546f;
+  border-color: #597da9;
   border-top-left-radius: 1.15rem 1.4rem;
   border-top-right-radius: 1.55rem 1.4rem;
   border-bottom-right-radius: 1.25rem 1.45rem;
   border-bottom-left-radius: 1.55rem 1.35rem;
   background:
-    radial-gradient(circle at 28% 22%, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0) 28%),
-    linear-gradient(166deg, rgba(255, 255, 255, 0.14) 0 34%, rgba(255, 255, 255, 0) 35%),
-    linear-gradient(180deg, #3c648e 0 48%, #31547d 49% 58%, #25446a 59% 74%, #1b3455 75% 100%);
+    linear-gradient(165deg, rgba(255, 255, 255, 0.18) 0 32%, rgba(255, 255, 255, 0) 33%),
+    linear-gradient(180deg, #7a98c0 0 36%, #617ea8 37% 56%, #48658f 57% 73%, #304a74 74% 100%);
   color: white;
   padding: 0.88rem 1.3rem 1.03rem;
   font-weight: 700;
   box-shadow:
-    0 7px 0 #183752,
-    0 11px 0 #11293d,
-    0 16px 24px rgba(15, 23, 42, 0.16),
-    inset 0 -10px 0 rgba(9, 23, 39, 0.16);
+    0 8px 0 #274766,
+    0 14px 22px rgba(33, 54, 85, 0.16),
+    inset 0 -14px 0 rgba(28, 46, 74, 0.25);
   text-shadow: 0 1px 0 rgba(8, 15, 31, 0.34);
 }
 
@@ -198,10 +193,9 @@ input {
   transform: translateY(-1px) rotate(0.35deg);
   filter: brightness(1.03);
   box-shadow:
-    0 8px 0 #183752,
-    0 12px 0 #11293d,
-    0 18px 26px rgba(15, 23, 42, 0.18),
-    inset 0 -10px 0 rgba(9, 23, 39, 0.16);
+    0 9px 0 #274766,
+    0 16px 24px rgba(33, 54, 85, 0.18),
+    inset 0 -14px 0 rgba(28, 46, 74, 0.25);
 }
 
 .cp-button-link {

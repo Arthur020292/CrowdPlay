@@ -92,9 +92,10 @@ export function HostPage() {
 
   if (phase === "lobby") {
     return (
-      <div className="grid gap-6 xl:grid-cols-[1.12fr_0.88fr]">
+      <div className="min-h-screen space-y-6 px-4 py-6 sm:px-6 lg:px-8">
         <HostLobbyStage
           code={code}
+          gameLabel="TapDash"
           playerCount={roster.length}
           playerLimit={summary?.config.playerLimit}
           minimumPlayers={2}
@@ -111,7 +112,7 @@ export function HostPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
       <section className="grid gap-6 xl:grid-cols-[1.4fr_0.6fr]">
         <div className="cp-card-panel p-6">
           <div className="mb-6 flex flex-wrap items-center justify-between gap-3">

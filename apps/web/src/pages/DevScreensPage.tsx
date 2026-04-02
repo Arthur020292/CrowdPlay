@@ -58,6 +58,48 @@ function LandingPreview() {
   );
 }
 
+function HostGamesPreview() {
+  return (
+    <div className="cp-card-panel p-8 sm:p-10">
+      <span className="cp-eyebrow cp-eyebrow-light">Choose a game</span>
+      <h1 className="mt-5 text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">Pick what the room will play.</h1>
+      <p className="mt-3 max-w-2xl text-base text-slate-600 sm:text-lg">
+        TapDash is ready to host now. More party games will appear here as CrowdPlay grows.
+      </p>
+
+      <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        {Array.from({ length: 10 }, (_, index) => {
+          const isLive = index === 0;
+          return (
+            <div
+              key={index}
+              className={`rounded-[1.7rem] border p-5 text-left ${
+                isLive ? "border-sky-200 bg-white/[0.94] shadow-[0_18px_34px_rgba(56,189,248,0.12)]" : "border-slate-200 bg-white/[0.68] opacity-80"
+              }`}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <span className={`rounded-full px-3 py-1 text-xs font-black uppercase tracking-[0.26em] ${isLive ? "bg-cyan-100 text-cyan-700" : "bg-slate-200 text-slate-500"}`}>
+                  {isLive ? "Live" : "Coming soon"}
+                </span>
+                <span className={`inline-flex size-11 items-center justify-center rounded-[1rem] border-4 text-lg font-black ${isLive ? "border-sky-300 bg-gradient-to-b from-cyan-200 to-sky-400 text-sky-900" : "border-slate-300 bg-slate-100 text-slate-400"}`}>
+                  {isLive ? "TD" : "?"}
+                </span>
+              </div>
+              <div className="mt-5 text-2xl font-black text-slate-950">{isLive ? "TapDash" : "Coming soon"}</div>
+              <p className="mt-2 text-sm leading-6 text-slate-600">{isLive ? "Rapid tapping race for a shared screen." : "More CrowdPlay party games are on the way."}</p>
+              <div className="mt-5">
+                <span className={isLive ? "cp-button-primary min-h-[3.8rem] min-w-[10rem] text-base font-black" : "inline-flex min-h-[3.8rem] min-w-[10rem] items-center justify-center rounded-[1.3rem] border border-slate-200 bg-white/[0.7] px-4 py-3 text-sm font-black uppercase tracking-[0.18em] text-slate-400"}>
+                  {isLive ? "Play TapDash" : "Soon"}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function HostRacePreview({
   code,
   phase,
@@ -77,16 +119,16 @@ function HostRacePreview({
 }) {
   return (
     <div className="grid gap-6 xl:grid-cols-[1.4fr_0.6fr]">
-      <div className="cp-card-dark p-6">
+      <div className="cp-card-panel p-6">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-sm uppercase tracking-[0.35em] text-cyan-200/80">Host Screen</p>
-            <h1 className="mt-2 text-4xl font-black tracking-tight text-white">{code}</h1>
-            <p className="mt-2 text-sm text-slate-400">Socket open • Phase {phase}</p>
+            <p className="text-sm uppercase tracking-[0.35em] text-sky-700/80">Host Screen</p>
+            <h1 className="mt-2 text-4xl font-black tracking-tight text-slate-950">{code}</h1>
+            <p className="mt-2 text-sm text-slate-500">Socket open • Phase {phase}</p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <div className="rounded-full border border-white/10 bg-white/[0.08] px-4 py-2 text-sm text-slate-300">
+            <div className="rounded-full border border-slate-200 bg-white/[0.84] px-4 py-2 text-sm font-medium text-slate-600">
               Remaining {formatRemainingLabel(phase, remainingMs)}
             </div>
             <button className="cp-button-primary px-5 py-3 text-sm">Start race</button>
@@ -103,9 +145,9 @@ function HostRacePreview({
         )}
 
         {podiumNames ? (
-          <div className="mt-6 rounded-[1.75rem] border border-amber-300/20 bg-amber-400/10 p-5">
-            <div className="text-sm uppercase tracking-[0.35em] text-amber-200/80">Podium</div>
-            <div className="mt-3 text-2xl font-black text-white">{podiumNames.join(" • ")}</div>
+          <div className="mt-6 rounded-[1.75rem] border border-amber-200 bg-amber-50/90 p-5">
+            <div className="text-sm uppercase tracking-[0.35em] text-amber-700/80">Podium</div>
+            <div className="mt-3 text-2xl font-black text-slate-950">{podiumNames.join(" • ")}</div>
             <button className="cp-button-secondary mt-4 px-4 py-2 text-sm">Open results</button>
           </div>
         ) : null}
@@ -234,6 +276,10 @@ export function DevScreensPage() {
         <LandingPreview />
       </DevSection>
 
+      <DevSection title="Host game picker" description="Full host flow after pressing Host a Game, with TapDash first and the rest marked coming soon.">
+        <HostGamesPreview />
+      </DevSection>
+
       <DevSection title="Join code" description="Single-purpose code entry before name and color.">
         <JoinCodePanel code={joinCode} onCodeChange={setJoinCode} onSubmit={noopSubmit} />
       </DevSection>
@@ -251,9 +297,10 @@ export function DevScreensPage() {
       </DevSection>
 
       <DevSection title="Host lobby" description="Game code hero, readiness state, and friendlier roster cards before the race begins.">
-        <div className="grid gap-6 xl:grid-cols-[1.12fr_0.88fr]">
+        <div className="space-y-6">
           <HostLobbyStage
             code="DEMO5"
+            gameLabel="TapDash"
             playerCount={previewRoster.length}
             playerLimit={30}
             minimumPlayers={2}
