@@ -295,12 +295,6 @@ export function DevScreensPage() {
           <HostLobbyStage
             code="DEMO5"
             gameLabel="TapDash"
-            playerCount={previewRoster.length}
-            playerLimit={30}
-            minimumPlayers={2}
-            canStart
-            joiningLabel="localhost:4177/join"
-            statusText="Socket open. Start as soon as at least 2 players are ready."
           />
           <LobbyRosterGrid players={previewRoster} />
         </div>

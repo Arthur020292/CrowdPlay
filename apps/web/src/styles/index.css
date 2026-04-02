@@ -104,6 +104,17 @@ input {
   backdrop-filter: blur(14px);
 }
 
+.cp-card-glass {
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 2rem;
+  background: rgba(255, 255, 255, 0.5);
+  color: var(--cp-text-dark);
+  box-shadow:
+    0 18px 44px rgba(15, 23, 42, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(14px);
+}
+
 .cp-eyebrow {
   display: inline-flex;
   align-items: center;
@@ -152,15 +163,15 @@ input {
   font-weight: 800;
   padding: 0.92rem 1.45rem 1.06rem;
   box-shadow:
-    0 8px 0 #2b8fae,
-    inset 0 -14px 0 #43bfdc;
+    0 6px 0 #349bbc,
+    inset 0 -10px 0 #43bfdc;
 }
 
 .cp-button-primary:hover:not(:disabled) {
   transform: translateY(-1px);
   box-shadow:
-    0 9px 0 #2b8fae,
-    inset 0 -14px 0 #43bfdc;
+    0 7px 0 #349bbc,
+    inset 0 -10px 0 #43bfdc;
 }
 
 .cp-button-secondary {
