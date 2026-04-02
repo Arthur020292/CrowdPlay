@@ -29,6 +29,7 @@ export interface PersistedSessionState {
   players: Array<{
     playerId: string;
     name: string;
+    color: "cyan" | "amber" | "rose" | "lime" | "violet" | "pink";
     joinedAt: number;
     connected: boolean;
     lastSeenAt: number;

@@ -1,8 +1,11 @@
+import type { PlayerColorId } from "@crowdplay/protocol";
+
 interface StoredPlayerSession {
   code: string;
   playerId: string;
   playerToken: string;
   name: string;
+  color: PlayerColorId;
 }
 
 const HOST_TOKEN_PREFIX = "crowdplay:host:";

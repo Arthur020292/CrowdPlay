@@ -1,6 +1,7 @@
 import {
   createSessionResponseSchema,
   joinSessionResponseSchema,
+  type PlayerColorId,
   type CreateSessionResponse,
   type JoinSessionResponse,
   type MatchResult
@@ -28,11 +29,11 @@ export async function createSession(input: {
   return createSessionResponseSchema.parse(await parseJson(response));
 }
 
-export async function joinSession(code: string, name: string): Promise<JoinSessionResponse> {
+export async function joinSession(code: string, name: string, color: PlayerColorId): Promise<JoinSessionResponse> {
   const response = await fetch(`/api/sessions/${code}/join`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ name })
+    body: JSON.stringify({ name, color })
   });
   return joinSessionResponseSchema.parse(await parseJson(response));
 }

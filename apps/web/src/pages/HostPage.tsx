@@ -72,7 +72,16 @@ export function HostPage() {
     );
   }
 
-  const livePlayers = snapshot?.players ?? roster.map((player) => ({ ...player, t: 0, status: player.connected ? "connected" : "disconnected" as const, id: player.id, d: player.distance, r: player.rank }));
+  const livePlayers =
+    snapshot?.players ??
+    roster.map((player) => ({
+      ...player,
+      t: 0,
+      status: player.connected ? "connected" : "disconnected",
+      id: player.id,
+      d: player.distance,
+      r: player.rank
+    }));
 
   return (
     <div className="space-y-6">

@@ -4,9 +4,11 @@ import { acceptTapBatch, buildStandings, stepRace } from "@crowdplay/game-tapdas
 import {
   PROTOCOL_VERSION,
   defaultSessionConfig,
+  getDefaultPlayerColor,
   parseClientEvent,
   type GamePhase,
   type MatchResult,
+  type PlayerColorId,
   type RosterPlayer,
   type ServerEvent,
   type SessionConfig,
@@ -210,6 +212,7 @@ export class GameSessionDurableObject extends DurableObject<Env> {
         player.playerId,
         {
           ...player,
+          color: player.color ?? getDefaultPlayerColor(),
           status: player.connected ? "connected" : player.status
         }
       ])
@@ -285,12 +288,13 @@ export class GameSessionDurableObject extends DurableObject<Env> {
       return Response.json({ error: { code: "SESSION_FULL", message: "Player limit reached." } }, { status: 409 });
     }
 
-    const payload = (await request.json()) as { name: string; playerId: string };
+    const payload = (await request.json()) as { name: string; color: PlayerColorId; playerId: string };
     const now = Date.now();
 
     const player: SessionPlayer = {
       playerId: payload.playerId,
       name: payload.name.trim(),
+      color: payload.color,
       joinedAt: now,
       connected: false,
       lastSeenAt: now,
@@ -528,6 +532,7 @@ export class GameSessionDurableObject extends DurableObject<Env> {
       .map((player) => ({
         id: player.playerId,
         name: player.name,
+        color: player.color,
         d: Math.round(player.distance * 100) / 100,
         r: player.rank,
         t: player.totalTaps,
@@ -554,6 +559,7 @@ export class GameSessionDurableObject extends DurableObject<Env> {
       .map((player) => ({
         id: player.playerId,
         name: player.name,
+        color: player.color,
         connected: player.connected,
         rank: player.rank,
         distance: Math.round(player.distance * 100) / 100

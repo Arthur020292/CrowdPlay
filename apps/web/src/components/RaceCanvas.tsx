@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useRef } from "react";
 
+import { getPlayerColorHex } from "@crowdplay/protocol";
+
 import type { SnapshotEvent } from "@crowdplay/protocol";
 
 interface RaceCanvasProps {
   snapshot: SnapshotEvent | null;
   previousSnapshot: SnapshotEvent | null;
 }
-
-const TRACK_COLORS = ["#22d3ee", "#f59e0b", "#f472b6", "#a3e635", "#fb7185", "#818cf8"];
 
 export function RaceCanvas({ snapshot, previousSnapshot }: RaceCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -66,7 +66,7 @@ export function RaceCanvas({ snapshot, previousSnapshot }: RaceCanvasProps) {
         const blendedDistance = previous ? previous.d + (player.d - previous.d) * alpha : player.d;
         const y = laneHeight * index + laneHeight / 2;
         const x = 24 * devicePixelRatio + (blendedDistance / maxDistance) * (widthPx - 80 * devicePixelRatio);
-        const color = TRACK_COLORS[index % TRACK_COLORS.length];
+        const color = getPlayerColorHex(player.color);
 
         context.strokeStyle = "rgba(255,255,255,0.1)";
         context.lineWidth = 2 * devicePixelRatio;
