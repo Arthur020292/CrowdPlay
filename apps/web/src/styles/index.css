@@ -138,64 +138,51 @@ input {
     transform 140ms ease,
     box-shadow 160ms ease,
     background-color 160ms ease,
-    opacity 160ms ease,
-    filter 160ms ease;
+    opacity 160ms ease;
 }
 
 .cp-button-primary {
-  border-color: #4fb1d3;
-  border-top-left-radius: 1.2rem 1.45rem;
-  border-top-right-radius: 1.65rem 1.45rem;
-  border-bottom-right-radius: 1.3rem 1.5rem;
-  border-bottom-left-radius: 1.7rem 1.35rem;
-  background:
-    linear-gradient(165deg, rgba(255, 255, 255, 0.28) 0 32%, rgba(255, 255, 255, 0) 33%),
-    linear-gradient(180deg, #9be9ff 0 36%, #7adbf5 37% 56%, #52c5e7 57% 73%, #2fa9d3 74% 100%);
-  color: #0d4566;
+  border-color: #2b8fae;
+  border-top-left-radius: 1.1rem 1.3rem;
+  border-top-right-radius: 1.5rem 1.28rem;
+  border-bottom-right-radius: 1.25rem 1.45rem;
+  border-bottom-left-radius: 1.55rem 1.22rem;
+  background: #7fe0f3;
+  color: #124d67;
   font-weight: 800;
-  padding: 0.92rem 1.45rem 1.08rem;
+  padding: 0.92rem 1.45rem 1.06rem;
   box-shadow:
-    0 8px 0 #167ca7,
-    0 14px 22px rgba(24, 103, 142, 0.18),
-    inset 0 -14px 0 rgba(14, 118, 162, 0.26);
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.28);
+    0 8px 0 #2b8fae,
+    inset 0 -14px 0 #43bfdc;
 }
 
 .cp-button-primary:hover:not(:disabled) {
-  transform: translateY(-1px) rotate(-0.4deg);
-  filter: saturate(1.04);
+  transform: translateY(-1px);
   box-shadow:
-    0 9px 0 #167ca7,
-    0 16px 24px rgba(24, 103, 142, 0.2),
-    inset 0 -14px 0 rgba(14, 118, 162, 0.26);
+    0 9px 0 #2b8fae,
+    inset 0 -14px 0 #43bfdc;
 }
 
 .cp-button-secondary {
-  border-color: #597da9;
-  border-top-left-radius: 1.15rem 1.4rem;
-  border-top-right-radius: 1.55rem 1.4rem;
+  border-color: #4e70a1;
+  border-top-left-radius: 1.1rem 1.3rem;
+  border-top-right-radius: 1.5rem 1.28rem;
   border-bottom-right-radius: 1.25rem 1.45rem;
-  border-bottom-left-radius: 1.55rem 1.35rem;
-  background:
-    linear-gradient(165deg, rgba(255, 255, 255, 0.18) 0 32%, rgba(255, 255, 255, 0) 33%),
-    linear-gradient(180deg, #7a98c0 0 36%, #617ea8 37% 56%, #48658f 57% 73%, #304a74 74% 100%);
+  border-bottom-left-radius: 1.55rem 1.22rem;
+  background: #7794c0;
   color: white;
-  padding: 0.88rem 1.3rem 1.03rem;
+  padding: 0.88rem 1.3rem 1.02rem;
   font-weight: 700;
   box-shadow:
-    0 8px 0 #274766,
-    0 14px 22px rgba(33, 54, 85, 0.16),
-    inset 0 -14px 0 rgba(28, 46, 74, 0.25);
-  text-shadow: 0 1px 0 rgba(8, 15, 31, 0.34);
+    0 8px 0 #4e70a1,
+    inset 0 -14px 0 #5d7faf;
 }
 
 .cp-button-secondary:hover:not(:disabled) {
-  transform: translateY(-1px) rotate(0.35deg);
-  filter: brightness(1.03);
+  transform: translateY(-1px);
   box-shadow:
-    0 9px 0 #274766,
-    0 16px 24px rgba(33, 54, 85, 0.18),
-    inset 0 -14px 0 rgba(28, 46, 74, 0.25);
+    0 9px 0 #4e70a1,
+    inset 0 -14px 0 #5d7faf;
 }
 
 .cp-button-link {

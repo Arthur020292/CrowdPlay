@@ -42,16 +42,16 @@ function DevSection({
 function LandingPreview() {
   return (
     <div className="flex min-h-[32rem] items-center justify-center">
-      <section className="cp-card-dark w-full max-w-4xl overflow-hidden px-8 py-12 text-center sm:px-12 sm:py-16">
-        <span className="cp-eyebrow">TapDash</span>
-        <h1 className="mx-auto mt-6 max-w-3xl text-4xl font-black tracking-tight text-white sm:text-6xl">Choose how you want to play.</h1>
-        <p className="mx-auto mt-4 max-w-2xl text-lg text-slate-300">
+      <section className="w-full max-w-4xl px-8 py-12 text-center sm:px-12 sm:py-16">
+        <span className="cp-eyebrow cp-eyebrow-light">TapDash</span>
+        <h1 className="mx-auto mt-6 max-w-3xl text-4xl font-black tracking-tight text-slate-900 sm:text-6xl">Choose how you want to play.</h1>
+        <p className="mx-auto mt-4 max-w-2xl text-lg text-slate-600">
           Host a game on the big screen or join one from your phone. That&apos;s it.
         </p>
 
         <div className="mt-10 grid gap-4 sm:mx-auto sm:max-w-2xl sm:grid-cols-2">
           <button className="cp-button-primary min-h-[4.75rem] text-lg font-black">Host a Game</button>
-          <button className="cp-button-secondary min-h-[4.75rem] bg-white/[0.14] text-lg font-black text-white">Join a Game</button>
+          <button className="cp-button-secondary min-h-[4.75rem] text-lg font-black">Join a Game</button>
         </div>
       </section>
     </div>
