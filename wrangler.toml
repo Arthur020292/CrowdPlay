@@ -17,7 +17,7 @@ new_sqlite_classes = ["GameSessionDurableObject"]
 [[d1_databases]]
 binding = "DB"
 database_name = "crowdplay"
-database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+database_id = "7af1e559-b162-4bbc-b847-3f7385c71a49"
 migrations_dir = "./migrations"
 
 [vars]
