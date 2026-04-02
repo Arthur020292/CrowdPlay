@@ -8,6 +8,7 @@ import { RaceCanvas } from "../components/RaceCanvas";
 import { useSessionSocket } from "../hooks/useSessionSocket";
 import { buildSessionSocketUrl, endSession, startSession } from "../lib/api";
 import { getHostToken, saveHostToken } from "../lib/storage";
+import { formatRemainingLabel } from "../lib/time";
 
 export function HostPage() {
   const navigate = useNavigate();
@@ -86,7 +87,7 @@ export function HostPage() {
 
             <div className="flex flex-wrap items-center gap-3">
               <div className="rounded-full border border-white/10 bg-slate-950/60 px-4 py-2 text-sm text-slate-300">
-                Remaining {Math.ceil(remainingMs / 1000)}s
+                Remaining {formatRemainingLabel(phase, remainingMs)}
               </div>
               <button
                 onClick={() => startSession(code, hostToken).catch((startError) => setError(startError instanceof Error ? startError.message : "Unable to start match."))}

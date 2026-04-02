@@ -6,6 +6,7 @@ import { PROTOCOL_VERSION, type MatchFinishedEvent, type SnapshotEvent } from "@
 import { useSessionSocket } from "../hooks/useSessionSocket";
 import { buildSessionSocketUrl, joinSession } from "../lib/api";
 import { getPlayerSession, savePlayerSession } from "../lib/storage";
+import { formatRemainingLabel } from "../lib/time";
 
 export function PlayPage() {
   const params = useParams();
@@ -154,7 +155,7 @@ export function PlayPage() {
           </div>
           <div className="mt-3 flex items-center justify-between text-sm text-slate-300">
             <span>Remaining</span>
-            <span className="text-lg font-semibold text-white">{Math.ceil(remainingMs / 1000)}s</span>
+            <span className="text-lg font-semibold text-white">{formatRemainingLabel(phase, remainingMs)}</span>
           </div>
           <div className="mt-4 h-3 overflow-hidden rounded-full bg-white/10">
             <div className="h-full rounded-full bg-cyan-400 transition-all" style={{ width: `${progress}%` }} />
