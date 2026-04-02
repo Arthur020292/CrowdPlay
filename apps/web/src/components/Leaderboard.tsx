@@ -11,22 +11,22 @@ interface LeaderboardProps {
 
 export function Leaderboard({ players, title }: LeaderboardProps) {
   return (
-    <section className="rounded-[2rem] border border-white/10 bg-white/5 p-5 backdrop-blur">
+    <section className="cp-card-dark p-5">
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-lg font-semibold text-white">{title}</h2>
-        <span className="text-xs uppercase tracking-[0.3em] text-slate-400">{players.length} players</span>
+        <span className="rounded-full bg-white/10 px-3 py-1 text-xs uppercase tracking-[0.3em] text-slate-300">{players.length} players</span>
       </div>
 
       <div className="space-y-2">
         {players.map((player, index) => (
           <div
             key={"playerId" in player ? player.playerId : player.id}
-            className="flex items-center justify-between rounded-2xl border border-white/5 bg-slate-900/70 px-4 py-3"
+            className="flex items-center justify-between rounded-[1.4rem] border border-white/[0.08] bg-white/[0.06] px-4 py-3"
           >
             <div>
               <div className="text-sm font-semibold text-white">
                 <span
-                  className="mr-2 inline-block size-3 rounded-full align-middle"
+                  className="mr-2 inline-block size-3 rounded-full align-middle shadow-[0_0_0_4px_rgba(255,255,255,0.08)]"
                   style={{ backgroundColor: "color" in player ? getPlayerColorHex(player.color) : "#22d3ee" }}
                 />
                 {index + 1}. {player.name}
