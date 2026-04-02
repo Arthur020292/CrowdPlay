@@ -27,10 +27,26 @@ body {
   margin: 0;
   min-width: 320px;
   background:
-    radial-gradient(circle at top left, rgba(56, 189, 248, 0.34), transparent 28%),
-    radial-gradient(circle at top right, rgba(245, 158, 11, 0.2), transparent 24%),
-    radial-gradient(circle at bottom left, rgba(132, 204, 22, 0.18), transparent 24%),
-    linear-gradient(180deg, #0b1730 0%, #081225 52%, #030712 100%);
+    radial-gradient(circle at 12% 10%, rgba(56, 189, 248, 0.22), transparent 24%),
+    radial-gradient(circle at 86% 14%, rgba(250, 204, 21, 0.18), transparent 20%),
+    radial-gradient(circle at 16% 82%, rgba(132, 204, 22, 0.14), transparent 18%),
+    radial-gradient(circle at 82% 76%, rgba(244, 114, 182, 0.12), transparent 18%),
+    radial-gradient(circle, rgba(148, 163, 184, 0.16) 1.6px, transparent 1.8px),
+    linear-gradient(180deg, #f8fcff 0%, #eef7ff 52%, #e7f1ff 100%);
+  background-size:
+    auto,
+    auto,
+    auto,
+    auto,
+    28px 28px,
+    auto;
+  background-position:
+    top left,
+    top right,
+    bottom left,
+    bottom right,
+    0 0,
+    center;
   color: #e2e8f0;
 }
 
@@ -101,35 +117,82 @@ input {
   align-items: center;
   justify-content: center;
   gap: 0.6rem;
-  border-radius: 999px;
-  border: 0;
+  border-style: solid;
+  border-width: 4px;
   cursor: pointer;
+  position: relative;
   transition:
     transform 140ms ease,
     box-shadow 160ms ease,
     background-color 160ms ease,
-    opacity 160ms ease;
+    opacity 160ms ease,
+    filter 160ms ease;
 }
 
 .cp-button-primary {
-  background: linear-gradient(180deg, #67e8f9 0%, #38bdf8 100%);
-  color: #082f49;
-  padding: 0.95rem 1.35rem;
+  border-color: #1988b5;
+  border-top-left-radius: 1.2rem 1.45rem;
+  border-top-right-radius: 1.65rem 1.45rem;
+  border-bottom-right-radius: 1.3rem 1.5rem;
+  border-bottom-left-radius: 1.7rem 1.35rem;
+  background:
+    radial-gradient(circle at 28% 22%, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 28%),
+    linear-gradient(166deg, rgba(255, 255, 255, 0.2) 0 34%, rgba(255, 255, 255, 0) 35%),
+    linear-gradient(180deg, #74eaff 0 48%, #58d7f9 49% 58%, #33bae6 59% 74%, #22a5d3 75% 100%);
+  color: #0a4162;
   font-weight: 800;
-  box-shadow: 0 14px 34px rgba(14, 165, 233, 0.32);
+  padding: 0.92rem 1.45rem 1.08rem;
+  box-shadow:
+    0 8px 0 #0d759f,
+    0 12px 0 #095f83,
+    0 18px 28px rgba(14, 165, 233, 0.22),
+    inset 0 2px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -10px 0 rgba(5, 72, 103, 0.18);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.28);
 }
 
 .cp-button-primary:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 18px 40px rgba(14, 165, 233, 0.36);
+  transform: translateY(-1px) rotate(-0.4deg);
+  filter: saturate(1.04);
+  box-shadow:
+    0 9px 0 #0d759f,
+    0 13px 0 #095f83,
+    0 20px 30px rgba(14, 165, 233, 0.26),
+    inset 0 2px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -10px 0 rgba(5, 72, 103, 0.18);
 }
 
 .cp-button-secondary {
-  border: 1px solid var(--cp-border-soft);
-  background: rgba(255, 255, 255, 0.08);
+  border-color: #27546f;
+  border-top-left-radius: 1.15rem 1.4rem;
+  border-top-right-radius: 1.55rem 1.4rem;
+  border-bottom-right-radius: 1.25rem 1.45rem;
+  border-bottom-left-radius: 1.55rem 1.35rem;
+  background:
+    radial-gradient(circle at 28% 22%, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0) 28%),
+    linear-gradient(166deg, rgba(255, 255, 255, 0.14) 0 34%, rgba(255, 255, 255, 0) 35%),
+    linear-gradient(180deg, #3c648e 0 48%, #31547d 49% 58%, #25446a 59% 74%, #1b3455 75% 100%);
   color: white;
-  padding: 0.9rem 1.25rem;
+  padding: 0.88rem 1.3rem 1.03rem;
   font-weight: 700;
+  box-shadow:
+    0 7px 0 #183752,
+    0 11px 0 #11293d,
+    0 16px 24px rgba(15, 23, 42, 0.16),
+    inset 0 2px 0 rgba(255, 255, 255, 0.22),
+    inset 0 -10px 0 rgba(9, 23, 39, 0.16);
+  text-shadow: 0 1px 0 rgba(8, 15, 31, 0.34);
+}
+
+.cp-button-secondary:hover:not(:disabled) {
+  transform: translateY(-1px) rotate(0.35deg);
+  filter: brightness(1.03);
+  box-shadow:
+    0 8px 0 #183752,
+    0 12px 0 #11293d,
+    0 18px 26px rgba(15, 23, 42, 0.18),
+    inset 0 2px 0 rgba(255, 255, 255, 0.22),
+    inset 0 -10px 0 rgba(9, 23, 39, 0.16);
 }
 
 .cp-button-link {
@@ -137,6 +200,7 @@ input {
   color: var(--cp-brand);
   padding: 0;
   font-weight: 700;
+  border-width: 0;
 }
 
 .cp-button-primary:disabled,
@@ -146,6 +210,14 @@ input {
   opacity: 0.6;
   transform: none;
   box-shadow: none;
+}
+
+.cp-dev-text {
+  color: #1e3a5f;
+}
+
+.cp-dev-subtext {
+  color: #496582;
 }
 
 .cp-input {
