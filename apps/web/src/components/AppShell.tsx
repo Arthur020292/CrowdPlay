@@ -19,6 +19,11 @@ export function AppShell() {
             <Link className="rounded-full px-3 py-2 transition hover:bg-white/10 hover:text-white" to="/join">
               Join Game
             </Link>
+            {import.meta.env.DEV ? (
+              <Link className="rounded-full px-3 py-2 transition hover:bg-white/10 hover:text-white" to="/dev/screens">
+                UI Preview
+              </Link>
+            ) : null}
           </nav>
         </header>
 
