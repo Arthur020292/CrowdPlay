@@ -171,13 +171,25 @@ export class GameSessionDurableObject extends DurableObject<Env> {
   }
 
   async alarm(): Promise<void> {
+    await this.restoreIfNeeded();
+
     const now = Date.now();
+    if (this.phase === "countdown" && this.countdownEndsAt && now >= this.countdownEndsAt) {
+      await this.runTick();
+      return;
+    }
+
+    if (this.phase === "live" && this.liveEndsAt && now >= this.liveEndsAt) {
+      await this.runTick();
+      return;
+    }
+
     if (this.phase === "finished" && this.endedAt && now - this.endedAt > EXPIRY_MS) {
       this.phase = "expired";
       await this.persistState(true);
       this.closeAllSockets(1001, "Session expired");
     } else {
-      this.ctx.storage.setAlarm(now + EXPIRY_MS);
+      await this.schedulePhaseAlarm();
     }
   }
 
@@ -412,6 +424,7 @@ export class GameSessionDurableObject extends DurableObject<Env> {
     this.phase = "countdown";
     this.countdownEndsAt = Date.now() + this.config.countdownMs;
     await this.persistState(true);
+    await this.schedulePhaseAlarm();
     this.broadcast({
       v: PROTOCOL_VERSION,
       type: "phase_changed",
@@ -453,7 +466,7 @@ export class GameSessionDurableObject extends DurableObject<Env> {
 
     await persistMatchResult(this.env.DB, this.lastResult);
     await this.persistState(true);
-    await this.ctx.storage.setAlarm(Date.now() + EXPIRY_MS);
+    await this.schedulePhaseAlarm();
 
     this.broadcast({
       v: PROTOCOL_VERSION,
@@ -495,6 +508,7 @@ export class GameSessionDurableObject extends DurableObject<Env> {
       this.startedAt = now;
       this.liveEndsAt = now + this.config.raceDurationMs;
       await this.persistState(true);
+      await this.schedulePhaseAlarm();
       this.broadcast({
         v: PROTOCOL_VERSION,
         type: "phase_changed",
@@ -594,6 +608,22 @@ export class GameSessionDurableObject extends DurableObject<Env> {
   private closeAllSockets(code: number, reason: string): void {
     for (const ws of this.ctx.getWebSockets()) {
       ws.close(code, reason);
+    }
+  }
+
+  private async schedulePhaseAlarm(): Promise<void> {
+    let nextAlarmAt: number | null = null;
+
+    if (this.phase === "countdown") {
+      nextAlarmAt = this.countdownEndsAt;
+    } else if (this.phase === "live") {
+      nextAlarmAt = this.liveEndsAt;
+    } else if (this.phase === "finished" && this.endedAt) {
+      nextAlarmAt = this.endedAt + EXPIRY_MS;
+    }
+
+    if (nextAlarmAt) {
+      await this.ctx.storage.setAlarm(nextAlarmAt);
     }
   }
 
