@@ -1,8 +1,17 @@
 import { FormEvent, useState } from "react";
 
-import { getPlayerAccentHex, getPlayerAvatarPreset, type PlayerAvatarId, type PlayerStateEvent, type SnapshotEvent } from "@crowdplay/protocol";
+import {
+  type GoldRushPlayerStateEvent,
+  type GoldRushSnapshotEvent,
+  type MatchResult,
+  type PlayerAvatarId,
+  type PlayerStateEvent,
+  type QuizDashSnapshotEvent,
+  type SnapshotEvent
+} from "@crowdplay/protocol";
 
 import { AvatarBadge } from "../components/AvatarBadge";
+import { ChaosFeed } from "../components/ChaosFeed";
 import { HostLobbyStage } from "../components/HostLobbyStage";
 import { HostPodium } from "../components/HostPodium";
 import { JoinCodePanel } from "../components/JoinCodePanel";
@@ -11,18 +20,26 @@ import { LobbyRosterGrid } from "../components/LobbyRosterGrid";
 import { PlayerIdentityPanel } from "../components/PlayerIdentityPanel";
 import { RaceCanvas } from "../components/RaceCanvas";
 import {
-  previewCountdownSnapshot,
-  previewCrowdedFinishedEvent,
-  previewCrowdedRoster,
-  previewFinishedEvent,
-  previewLiveCrowdedPreviousSnapshot,
-  previewLiveCrowdedSnapshot,
-  previewMatchResult,
-  previewPlayerEffectState,
-  previewPlayerLockoutState,
-  previewPlayerQuestionState,
-  previewPlayerRewardState,
-  previewRoster
+  previewChaosEvents,
+  previewGoldRushCountdownSnapshot,
+  previewGoldRushFinishedEvent,
+  previewGoldRushLiveSnapshot,
+  previewGoldRushMatchResult,
+  previewGoldRushPlayerChestState,
+  previewGoldRushPlayerEffectState,
+  previewGoldRushPlayerLockoutState,
+  previewGoldRushPlayerQuestionState,
+  previewGoldRushPlayerTargetState,
+  previewGoldRushRoster,
+  previewQuizDashPlayerChestState,
+  previewQuizDashPlayerEffectState,
+  previewQuizDashPlayerQuestionState,
+  previewQuizDashPlayerTargetState,
+  previewQuizDashFinishedEvent,
+  previewQuizDashLiveSnapshot,
+  previewQuizDashMatchResult,
+  previewQuizDashPreviousSnapshot,
+  previewQuizDashRoster
 } from "../dev/fixtures";
 import { formatRemainingLabel } from "../lib/time";
 
@@ -61,6 +78,19 @@ function LandingPreview() {
 }
 
 function HostGamesPreview() {
+  const liveTiles = [
+    {
+      title: "Gold Rush",
+      description: "Answer questions, open hidden chests, and unleash chaos on the top vaults.",
+      cta: "Play Gold Rush"
+    },
+    {
+      title: "QuizDash",
+      description: "Answer fast and build distance in a straight-up race to the finish.",
+      cta: "Play QuizDash"
+    }
+  ];
+
   return (
     <div>
       <span className="cp-eyebrow cp-eyebrow-light">Choose a game</span>
@@ -68,22 +98,20 @@ function HostGamesPreview() {
 
       <div className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         {Array.from({ length: 10 }, (_, index) => {
-          const isLive = index === 0;
+          const tile = liveTiles[index] ?? null;
+          const isLive = Boolean(tile);
           return (
             <div key={index} className={`rounded-[1.9rem] border p-5 text-left ${isLive ? "border-sky-200/90 bg-white/[0.76] shadow-[0_20px_40px_rgba(56,189,248,0.10)] backdrop-blur-[10px]" : "border-slate-200/80 bg-white/[0.54] backdrop-blur-[10px]"}`}>
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
                 <span className={`rounded-full px-3 py-1 text-xs font-black uppercase tracking-[0.26em] ${isLive ? "bg-cyan-100/90 text-cyan-700" : "bg-slate-200/90 text-slate-500"}`}>
                   {isLive ? "Live" : "Coming soon"}
                 </span>
-                <span className={`inline-flex size-11 items-center justify-center rounded-[1rem] border-4 text-lg font-black ${isLive ? "border-sky-300 bg-gradient-to-b from-cyan-200 to-sky-400 text-sky-900" : "border-slate-300 bg-white/[0.78] text-slate-400"}`}>
-                  {isLive ? "QD" : "?"}
-                </span>
               </div>
-              <div className="mt-5 text-2xl font-black text-slate-950">{isLive ? "QuizDash" : "Coming soon"}</div>
-              <p className="mt-2 text-sm leading-6 text-slate-600">{isLive ? "Answer fast, pick rewards, and survive the chaos." : "More CrowdPlay party games are on the way."}</p>
+              <div className="mt-5 text-2xl font-black text-slate-950">{tile?.title ?? "Coming soon"}</div>
+              <p className="mt-2 text-sm leading-6 text-slate-600">{tile?.description ?? "More CrowdPlay party games are on the way."}</p>
               <div className="mt-5">
                 <span className={isLive ? "cp-button-primary min-h-[3.8rem] min-w-[10rem] text-base font-black" : "inline-flex min-h-[3.8rem] min-w-[10rem] items-center justify-center rounded-[1.3rem] border border-slate-200/80 bg-white/[0.58] px-4 py-3 text-sm font-black uppercase tracking-[0.18em] text-slate-400"}>
-                  {isLive ? "Play QuizDash" : "Soon"}
+                  {tile?.cta ?? "Soon"}
                 </span>
               </div>
             </div>
@@ -94,110 +122,52 @@ function HostGamesPreview() {
   );
 }
 
-function HostRacePreview({
-  phase,
-  remainingMs,
-  players,
-  snapshot,
-  previousSnapshot,
-  lanePlayerIds,
-  podiumStandings
-}: {
-  phase: string;
-  remainingMs: number;
-  players: Parameters<typeof Leaderboard>[0]["players"];
-  snapshot: SnapshotEvent | null;
-  previousSnapshot: SnapshotEvent | null;
-  lanePlayerIds?: string[];
-  podiumStandings?: typeof previewFinishedEvent.standings;
-}) {
+function GoldRushHostPreview({ snapshot }: { snapshot: GoldRushSnapshotEvent }) {
   return (
-    <div className="grid gap-6 xl:min-h-[calc(100vh-3rem)] xl:grid-cols-[1.4fr_0.6fr]">
-      <div className="flex min-h-0 flex-col">
-        {podiumStandings ? (
-          <HostPodium
-            standings={podiumStandings}
-            action={<button className="cp-button-secondary px-4 py-2 text-sm">Open results</button>}
-          />
-        ) : snapshot ? (
-          <RaceCanvas
-            snapshot={snapshot}
-            previousSnapshot={previousSnapshot}
-            className="min-h-[420px] flex-1"
-            lanePlayerIds={lanePlayerIds}
-          />
-        ) : null}
+    <div className="grid gap-6 xl:min-h-[calc(100vh-3rem)] xl:grid-cols-[1.15fr_0.85fr]">
+      <div className="flex min-h-0 flex-col gap-6">
+        <ChaosFeed events={previewChaosEvents} className="flex-1" headerBadge={`Remaining ${formatRemainingLabel(snapshot.phase, snapshot.remainingMs)}`} />
       </div>
 
-      <Leaderboard
-        players={players}
-        title={phase === "finished" ? "Final standings" : "Live standings"}
-        scrollable={phase === "live" || phase === "finished"}
-        headerActions={
-          phase === "live" ? (
-            <>
-              <div className="rounded-full border border-slate-200 bg-white/[0.84] px-4 py-2 text-sm font-medium text-slate-600">
-                Remaining {formatRemainingLabel(phase, remainingMs)}
-              </div>
-              <button className="cp-button-secondary px-5 py-3 text-sm">Stop</button>
-            </>
-          ) : null
-        }
-      />
+      <Leaderboard players={snapshot.players} title="Live standings" scrollable showSecondaryText={false} showMetricRank={false} />
     </div>
   );
 }
 
-function PlayerGamePreview({
-  playerState,
+function QuizDashHostPreview({
   snapshot,
-  phase,
-  remainingMs
+  previousSnapshot
+}: {
+  snapshot: QuizDashSnapshotEvent;
+  previousSnapshot: QuizDashSnapshotEvent;
+}) {
+  return (
+    <div className="grid gap-6 xl:min-h-[calc(100vh-3rem)] xl:grid-cols-[1.4fr_0.6fr]">
+      <RaceCanvas snapshot={snapshot} previousSnapshot={previousSnapshot} className="min-h-[420px] flex-1" lanePlayerIds={snapshot.players.map((player) => player.id)} />
+      <Leaderboard players={snapshot.players} title="Live standings" scrollable />
+    </div>
+  );
+}
+
+function PlayerControllerPreview({
+  playerState,
+  snapshot
 }: {
   playerState: PlayerStateEvent;
-  snapshot: SnapshotEvent | null;
-  phase: string;
-  remainingMs: number;
+  snapshot: SnapshotEvent;
 }) {
-  const me = snapshot?.players.find((player) => player.id === playerState.playerId);
-  const leaderDistance = snapshot?.players[0]?.d ?? 1;
-  const progress = Math.min((playerState.distance / Math.max(leaderDistance, 1)) * 100, 100);
+  const me = snapshot.players.find((player) => player.id === playerState.playerId);
   const accentAvatarId = me?.avatarId ?? "fox";
-  const lockoutRemainingMs = playerState.lockoutEndsAt ? Math.max(0, playerState.lockoutEndsAt - Date.now()) : 0;
+  const goldRushState = playerState.gameType === "goldrush" ? (playerState as GoldRushPlayerStateEvent) : null;
+  const chestState = goldRushState ?? playerState;
+  const lockoutRemainingMs = goldRushState?.lockoutEndsAt ? Math.max(0, goldRushState.lockoutEndsAt - Date.now()) : 0;
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-6">
       <section className="cp-card-dark p-6 text-center">
-        <h1 className="text-4xl font-black text-white">Ava</h1>
-        <div className="mt-4 inline-flex items-center gap-3 rounded-full border border-white/10 bg-white/[0.08] px-3 py-2 text-sm text-slate-200">
+        <div className="flex items-center justify-center gap-4">
           <AvatarBadge avatarId={accentAvatarId} size={40} />
-          {getPlayerAvatarPreset(accentAvatarId).label}
-        </div>
-
-        <div className="mt-6 rounded-[1.5rem] border border-white/10 bg-white/[0.07] p-4">
-          <div className="grid gap-3 sm:grid-cols-4">
-            <div className="rounded-[1.25rem] bg-slate-950/50 px-4 py-3">
-              <div className="text-xs uppercase tracking-[0.25em] text-slate-400">Rank</div>
-              <div className="mt-2 text-2xl font-black text-white">{playerState.rank}</div>
-            </div>
-            <div className="rounded-[1.25rem] bg-slate-950/50 px-4 py-3">
-              <div className="text-xs uppercase tracking-[0.25em] text-slate-400">Distance</div>
-              <div className="mt-2 text-2xl font-black" style={{ color: getPlayerAccentHex(accentAvatarId) }}>
-                {playerState.distance.toFixed(1)}m
-              </div>
-            </div>
-            <div className="rounded-[1.25rem] bg-slate-950/50 px-4 py-3">
-              <div className="text-xs uppercase tracking-[0.25em] text-slate-400">Correct</div>
-              <div className="mt-2 text-2xl font-black text-white">{playerState.correctAnswers}</div>
-            </div>
-            <div className="rounded-[1.25rem] bg-slate-950/50 px-4 py-3">
-              <div className="text-xs uppercase tracking-[0.25em] text-slate-400">Remaining</div>
-              <div className="mt-2 text-2xl font-black text-white">{formatRemainingLabel(phase, remainingMs)}</div>
-            </div>
-          </div>
-          <div className="mt-4 h-3 overflow-hidden rounded-full bg-white/10">
-            <div className="h-full rounded-full transition-all" style={{ width: `${progress}%`, backgroundColor: getPlayerAccentHex(accentAvatarId) }} />
-          </div>
+          <h1 className="text-4xl font-black text-white">Ava</h1>
         </div>
 
         {playerState.recentOutcome ? (
@@ -207,26 +177,37 @@ function PlayerGamePreview({
           </div>
         ) : null}
 
-        {phase === "finished" ? (
-          <div className="mt-6 rounded-[1.75rem] border border-amber-300/20 bg-[linear-gradient(180deg,rgba(120,53,15,0.28),rgba(8,18,37,0.84))] p-6 text-left">
-            <div className="text-xs font-black uppercase tracking-[0.3em] text-amber-200/80">Match complete</div>
-            <h2 className="mt-3 text-2xl font-black text-white">The race is over.</h2>
-            <p className="mt-3 text-sm leading-6 text-slate-300">Check the host screen for the podium or scroll down here for the final standings.</p>
-          </div>
-        ) : playerState.pendingRewardChoice ? (
+        {chestState.pendingTargetPick ? (
           <div className="mt-6 rounded-[1.75rem] border border-white/10 bg-white/[0.06] p-6 text-left">
-            <div className="text-xs font-black uppercase tracking-[0.3em] text-sky-200">Choose your reward</div>
-            <h2 className="mt-3 text-2xl font-black text-white">Play it safe or open chaos.</h2>
-            <div className="mt-6 grid gap-4 md:grid-cols-2">
-              <button className="cp-button-primary min-h-[4.5rem] text-base font-black">Move forward</button>
-              <button className="cp-button-secondary min-h-[4.5rem] text-base font-black">Random effect</button>
+            <div className="text-xs font-black uppercase tracking-[0.3em] text-amber-200">Pick a target</div>
+            <h2 className="mt-3 text-2xl font-black text-white">
+              {playerState.gameType === "goldrush" ? "Choose one of the top vaults." : "Choose one of the top racers."}
+            </h2>
+            <div className="mt-6 grid gap-3">
+              {chestState.availableTargets.map((target) => (
+                <div key={target.playerId} className="flex items-center justify-between rounded-[1.4rem] border border-white/12 bg-white/[0.08] px-5 py-4">
+                  <span className="font-semibold text-white">{target.name}</span>
+                  <span className="text-sm font-semibold text-amber-200">Pick</span>
+                </div>
+              ))}
             </div>
           </div>
-        ) : playerState.lockoutEndsAt ? (
+        ) : chestState.pendingChestPick ? (
+          <div className="mt-6 rounded-[1.75rem] border border-white/10 bg-white/[0.06] p-6 text-left">
+            <div className="text-xs font-black uppercase tracking-[0.3em] text-sky-200">Pick a chest</div>
+            <h2 className="mt-3 text-2xl font-black text-white">Choose 1 of 3 hidden chests.</h2>
+            <div className="mt-6 grid gap-4 md:grid-cols-3">
+              {[1, 2, 3].map((index) => (
+                <div key={index} className="rounded-[1.8rem] border border-amber-200/60 bg-[linear-gradient(180deg,rgba(254,243,199,0.96),rgba(253,230,138,0.82))] px-5 py-7 text-center text-lg font-black text-amber-950">
+                  Chest {index}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : goldRushState?.lockoutEndsAt ? (
           <div className="mt-6 rounded-[1.75rem] border border-rose-300/20 bg-rose-400/10 p-6 text-left">
             <div className="text-xs font-black uppercase tracking-[0.3em] text-rose-200">Locked out</div>
             <h2 className="mt-3 text-2xl font-black text-white">Next question unlocks in {Math.max(1, Math.ceil(lockoutRemainingMs / 1000))}s.</h2>
-            <p className="mt-3 text-sm leading-6 text-slate-300">Wrong answers trigger a short freeze before the next question goes live.</p>
           </div>
         ) : playerState.currentQuestion ? (
           <div className="mt-6 rounded-[1.75rem] border border-white/10 bg-white/[0.06] p-6 text-left">
@@ -248,33 +229,51 @@ function PlayerGamePreview({
   );
 }
 
-function ResultsPreviewCard() {
+function ResultsPreviewCard({ result }: { result: MatchResult }) {
+  const isGoldRush = result.gameType === "goldrush";
+
   return (
     <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
       <section className="cp-card-dark p-8">
         <p className="text-sm uppercase tracking-[0.35em] text-cyan-200/80">Match result</p>
-        <h1 className="mt-3 text-4xl font-black text-white">Session {previewMatchResult.code}</h1>
+        <h1 className="mt-3 text-4xl font-black text-white">Session {result.code}</h1>
         <p className="mt-4 text-slate-300">
-          {previewMatchResult.playerCount} players • {Math.round(previewMatchResult.durationMs / 1000)} second race • Winning distance {previewMatchResult.stats.winningDistance.toFixed(1)}m
+          {result.playerCount} players • {Math.round(result.durationMs / 1000)} second {isGoldRush ? "match" : "race"} •{" "}
+          {isGoldRush ? `Winning vault ${result.stats.winningGold} gold` : `Winning distance ${result.stats.winningDistance.toFixed(1)}m`}
         </p>
 
         <div className="mt-6 grid gap-4 sm:grid-cols-3">
           <div className="rounded-[1.5rem] border border-white/10 bg-slate-950/70 p-4">
             <div className="text-xs uppercase tracking-[0.35em] text-slate-400">Winners</div>
-            <div className="mt-2 text-2xl font-black text-white">{previewMatchResult.winners.length}</div>
+            <div className="mt-2 text-2xl font-black text-white">{result.winners.length}</div>
           </div>
-          <div className="rounded-[1.5rem] border border-white/10 bg-slate-950/70 p-4">
-            <div className="text-xs uppercase tracking-[0.35em] text-slate-400">Correct answers</div>
-            <div className="mt-2 text-2xl font-black text-white">{previewMatchResult.stats.totalCorrectAnswers}</div>
-          </div>
-          <div className="rounded-[1.5rem] border border-white/10 bg-slate-950/70 p-4">
-            <div className="text-xs uppercase tracking-[0.35em] text-slate-400">Chaos effects</div>
-            <div className="mt-2 text-2xl font-black text-white">{previewMatchResult.stats.totalEffectsTriggered}</div>
-          </div>
+          {isGoldRush ? (
+            <>
+              <div className="rounded-[1.5rem] border border-white/10 bg-slate-950/70 p-4">
+                <div className="text-xs uppercase tracking-[0.35em] text-slate-400">Correct answers</div>
+                <div className="mt-2 text-2xl font-black text-white">{result.stats.totalCorrectAnswers}</div>
+              </div>
+              <div className="rounded-[1.5rem] border border-white/10 bg-slate-950/70 p-4">
+                <div className="text-xs uppercase tracking-[0.35em] text-slate-400">Chaos chests</div>
+                <div className="mt-2 text-2xl font-black text-white">{result.stats.totalChaosTriggers}</div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="rounded-[1.5rem] border border-white/10 bg-slate-950/70 p-4">
+                <div className="text-xs uppercase tracking-[0.35em] text-slate-400">Correct answers</div>
+                <div className="mt-2 text-2xl font-black text-white">{result.stats.totalCorrectAnswers}</div>
+              </div>
+              <div className="rounded-[1.5rem] border border-white/10 bg-slate-950/70 p-4">
+                <div className="text-xs uppercase tracking-[0.35em] text-slate-400">Wrong answers</div>
+                <div className="mt-2 text-2xl font-black text-white">{result.stats.totalWrongAnswers}</div>
+              </div>
+            </>
+          )}
         </div>
       </section>
 
-      <Leaderboard players={previewMatchResult.standings} title="Final standings" />
+      <Leaderboard players={result.standings} title="Final standings" />
     </div>
   );
 }
@@ -289,9 +288,9 @@ export function DevScreensPage() {
     <div className="space-y-12">
       <section className="rounded-[2rem] border border-cyan-300/20 bg-cyan-400/10 p-6">
         <p className="cp-dev-text text-sm uppercase tracking-[0.35em]">Dev Preview</p>
-        <h1 className="cp-dev-text mt-3 text-4xl font-black">QuizDash screen gallery</h1>
+        <h1 className="cp-dev-text mt-3 text-4xl font-black">CrowdPlay screen gallery</h1>
         <p className="cp-dev-subtext mt-3 max-w-3xl">
-          Review the quiz-race onboarding, host states, player question flow, and podium/results screens without creating a live session.
+          Review both live games, their host states, player controllers, and result screens without creating a session.
         </p>
       </section>
 
@@ -299,7 +298,7 @@ export function DevScreensPage() {
         <LandingPreview />
       </DevSection>
 
-      <DevSection title="Host game picker" description="QuizDash leads the host flow, with the rest reserved for future games.">
+      <DevSection title="Host game picker" description="Two real game tiles now lead to distinct modes.">
         <HostGamesPreview />
       </DevSection>
 
@@ -307,100 +306,88 @@ export function DevScreensPage() {
         <JoinCodePanel code={joinCode} onCodeChange={setJoinCode} onSubmit={noopSubmit} />
       </DevSection>
 
-      <DevSection title="Player name" description="Focused first step for choosing a display name.">
-        <PlayerIdentityPanel
-          code="DEMO5"
-          name={name}
-          avatarId={avatarId}
-          step="name"
-          onNameChange={setName}
-          onAvatarChange={setAvatarId}
-          onContinue={() => undefined}
-          onBack={() => undefined}
-          onSubmit={noopSubmit}
-          ctaLabel="Continue"
-        />
-      </DevSection>
-
-      <DevSection title="Player avatar" description="Second step for choosing an avatar before entering the match.">
-        <PlayerIdentityPanel
-          code="DEMO5"
-          name={name}
-          avatarId={avatarId}
-          step="avatar"
-          onNameChange={setName}
-          onAvatarChange={setAvatarId}
-          onContinue={() => undefined}
-          onBack={() => undefined}
-          onSubmit={noopSubmit}
-          ctaLabel="Enter game"
-        />
-      </DevSection>
-
-      <DevSection title="Host lobby" description="Game code hero and roster before the quiz race begins.">
-        <div className="space-y-6">
-          <HostLobbyStage code="DEMO5" gameLabel="QuizDash" />
-          <LobbyRosterGrid players={previewRoster} />
-        </div>
-      </DevSection>
-
-      <DevSection title="Host countdown" description="Countdown stays in the lobby, then players begin answering on their own devices.">
-        <div className="space-y-6">
-          <HostLobbyStage
+      <DevSection title="Player onboarding" description="Focused name and avatar flow before joining the room.">
+        <div className="grid gap-6 lg:grid-cols-2">
+          <PlayerIdentityPanel
             code="DEMO5"
-            gameLabel="QuizDash"
-            phase="countdown"
-            remainingMs={previewCountdownSnapshot.remainingMs}
-            playerCount={previewRoster.length}
+            name={name}
+            avatarId={avatarId}
+            step="name"
+            onNameChange={setName}
+            onAvatarChange={setAvatarId}
+            onContinue={() => undefined}
+            onBack={() => undefined}
+            onSubmit={noopSubmit}
+            ctaLabel="Continue"
           />
-          <LobbyRosterGrid players={previewRoster} />
+          <PlayerIdentityPanel
+            code="DEMO5"
+            name={name}
+            avatarId={avatarId}
+            step="avatar"
+            onNameChange={setName}
+            onAvatarChange={setAvatarId}
+            onContinue={() => undefined}
+            onBack={() => undefined}
+            onSubmit={noopSubmit}
+            ctaLabel="Enter game"
+          />
         </div>
       </DevSection>
 
-      <DevSection title="Host live race" description="Mid-race state with stable lanes, live standings, and a larger simulated field.">
-        <HostRacePreview
-          phase="live"
-          remainingMs={previewLiveCrowdedSnapshot.remainingMs}
-          players={previewLiveCrowdedSnapshot.players}
-          snapshot={previewLiveCrowdedSnapshot}
-          previousSnapshot={previewLiveCrowdedPreviousSnapshot}
-          lanePlayerIds={previewCrowdedRoster.map((player) => player.id)}
-        />
+      <DevSection title="Gold Rush lobby" description="Countdown and roster before the vault chaos begins.">
+        <div className="space-y-6">
+          <HostLobbyStage code="GOLD5" gameLabel="Gold Rush" />
+          <LobbyRosterGrid players={previewGoldRushRoster} />
+          <HostLobbyStage
+            code="GOLD5"
+            gameLabel="Gold Rush"
+            phase="countdown"
+            remainingMs={previewGoldRushCountdownSnapshot.remainingMs}
+            playerCount={previewGoldRushRoster.length}
+          />
+        </div>
       </DevSection>
 
-      <DevSection title="Host podium" description="End-of-match state with podium treatment and scrollable final standings.">
-        <HostRacePreview
-          phase="finished"
-          remainingMs={0}
-          players={previewCrowdedFinishedEvent.standings}
-          snapshot={null}
-          previousSnapshot={null}
-          podiumStandings={previewCrowdedFinishedEvent.standings}
-        />
+      <DevSection title="Gold Rush live" description="Gold standings and a chaos feed replace the race track.">
+        <GoldRushHostPreview snapshot={previewGoldRushLiveSnapshot} />
       </DevSection>
 
-      <DevSection title="Player question" description="Primary answering state for multiple choice and true/false prompts.">
-        <PlayerGamePreview playerState={previewPlayerQuestionState} snapshot={previewLiveCrowdedSnapshot} phase="live" remainingMs={previewLiveCrowdedSnapshot.remainingMs} />
+      <DevSection title="QuizDash live" description="The race canvas stays in place while question answers and chest swings move racers around.">
+        <QuizDashHostPreview snapshot={previewQuizDashLiveSnapshot} previousSnapshot={previewQuizDashPreviousSnapshot} />
       </DevSection>
 
-      <DevSection title="Player reward choice" description="Correct answers lead to a choice between safe progress and random chaos.">
-        <PlayerGamePreview playerState={previewPlayerRewardState} snapshot={previewLiveCrowdedSnapshot} phase="live" remainingMs={previewLiveCrowdedSnapshot.remainingMs} />
+      <DevSection title="Podiums" description="Each game ends with its own scoring language but shares the same podium treatment.">
+        <div className="grid gap-6 lg:grid-cols-2">
+          <HostPodium standings={previewGoldRushFinishedEvent.standings} action={<button className="cp-button-secondary px-4 py-2 text-sm">Open results</button>} />
+          <HostPodium standings={previewQuizDashFinishedEvent.standings} action={<button className="cp-button-secondary px-4 py-2 text-sm">Open results</button>} />
+        </div>
       </DevSection>
 
-      <DevSection title="Player lockout" description="Wrong answers trigger a temporary freeze before the next question unlocks.">
-        <PlayerGamePreview playerState={previewPlayerLockoutState} snapshot={previewLiveCrowdedSnapshot} phase="live" remainingMs={previewLiveCrowdedSnapshot.remainingMs} />
+      <DevSection title="Gold Rush player states" description="Question, chest, target, lockout, and recent-outcome flows.">
+        <div className="space-y-8">
+          <PlayerControllerPreview playerState={previewGoldRushPlayerQuestionState} snapshot={previewGoldRushLiveSnapshot} />
+          <PlayerControllerPreview playerState={previewGoldRushPlayerChestState} snapshot={previewGoldRushLiveSnapshot} />
+          <PlayerControllerPreview playerState={previewGoldRushPlayerTargetState} snapshot={previewGoldRushLiveSnapshot} />
+          <PlayerControllerPreview playerState={previewGoldRushPlayerLockoutState} snapshot={previewGoldRushLiveSnapshot} />
+          <PlayerControllerPreview playerState={previewGoldRushPlayerEffectState} snapshot={previewGoldRushLiveSnapshot} />
+        </div>
       </DevSection>
 
-      <DevSection title="Player chaos outcome" description="Random effects can steal, swap, trap, or launch a player forward.">
-        <PlayerGamePreview playerState={previewPlayerEffectState} snapshot={previewLiveCrowdedSnapshot} phase="live" remainingMs={previewLiveCrowdedSnapshot.remainingMs} />
+      <DevSection title="QuizDash player states" description="Race mode now shares the same question, chest, target, and recent-outcome flow.">
+        <div className="space-y-8">
+          <PlayerControllerPreview playerState={previewQuizDashPlayerQuestionState} snapshot={previewQuizDashLiveSnapshot} />
+          <PlayerControllerPreview playerState={previewQuizDashPlayerChestState} snapshot={previewQuizDashLiveSnapshot} />
+          <PlayerControllerPreview playerState={previewQuizDashPlayerTargetState} snapshot={previewQuizDashLiveSnapshot} />
+          <PlayerControllerPreview playerState={previewQuizDashPlayerEffectState} snapshot={previewQuizDashLiveSnapshot} />
+        </div>
       </DevSection>
 
-      <DevSection title="Player post-match" description="Controller end state after time runs out.">
-        <PlayerGamePreview playerState={previewPlayerEffectState} snapshot={previewLiveCrowdedSnapshot} phase="finished" remainingMs={0} />
-      </DevSection>
-
-      <DevSection title="Results page" description="Standalone match summary screen after the host opens results.">
-        <ResultsPreviewCard />
+      <DevSection title="Results" description="Separate result summaries for both Gold Rush and QuizDash.">
+        <div className="space-y-8">
+          <ResultsPreviewCard result={previewGoldRushMatchResult} />
+          <ResultsPreviewCard result={previewQuizDashMatchResult} />
+        </div>
       </DevSection>
     </div>
   );

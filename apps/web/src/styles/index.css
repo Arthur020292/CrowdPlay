@@ -27,27 +27,16 @@ body {
   margin: 0;
   min-width: 320px;
   background:
-    radial-gradient(circle at 12% 10%, rgba(56, 189, 248, 0.22), transparent 24%),
-    radial-gradient(circle at 86% 14%, rgba(250, 204, 21, 0.18), transparent 20%),
-    radial-gradient(circle at 16% 82%, rgba(132, 204, 22, 0.14), transparent 18%),
-    radial-gradient(circle at 82% 76%, rgba(244, 114, 182, 0.12), transparent 18%),
     radial-gradient(circle, rgba(148, 163, 184, 0.16) 1.6px, transparent 1.8px),
     linear-gradient(180deg, #f8fcff 0%, #eef7ff 52%, #e7f1ff 100%);
   background-size:
-    auto,
-    auto,
-    auto,
-    auto,
     28px 28px,
     auto;
   background-position:
-    top left,
-    top right,
-    bottom left,
-    bottom right,
     0 0,
     center;
   color: #e2e8f0;
+  overflow-x: hidden;
 }
 
 * {
@@ -70,6 +59,85 @@ input {
   background: linear-gradient(180deg, rgba(11, 23, 48, 0.92), rgba(8, 18, 37, 0.82));
   box-shadow: 0 28px 80px rgba(2, 6, 23, 0.28);
   backdrop-filter: blur(18px);
+}
+
+.cp-page-background {
+  position: relative;
+  isolation: isolate;
+}
+
+.cp-page-background::before,
+.cp-page-background::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  will-change: transform, opacity;
+}
+
+.cp-page-background::before {
+  background:
+    radial-gradient(circle at 12% 10%, rgba(56, 189, 248, 0.22), transparent 24%),
+    radial-gradient(circle at 86% 14%, rgba(250, 204, 21, 0.18), transparent 20%),
+    radial-gradient(circle at 16% 82%, rgba(132, 204, 22, 0.14), transparent 18%),
+    radial-gradient(circle at 82% 76%, rgba(244, 114, 182, 0.12), transparent 18%);
+  opacity: 0.92;
+}
+
+.cp-page-background::after {
+  background: none;
+  opacity: 0;
+}
+
+.cp-page-background--ambient::before {
+  animation: cp-bg-drift-a 32s ease-in-out infinite alternate, cp-bg-breathe 24s ease-in-out infinite alternate;
+}
+
+.cp-page-background--ambient::after {
+  animation: none;
+}
+
+.cp-page-background--static::before,
+.cp-page-background--static::after {
+  animation: none;
+}
+
+@keyframes cp-bg-drift-a {
+  0% {
+    transform: translate3d(-1.5%, -1%, 0);
+  }
+
+  100% {
+    transform: translate3d(1.75%, 1.25%, 0);
+  }
+}
+
+@keyframes cp-bg-drift-b {
+  0% {
+    transform: translate3d(1.25%, 1%, 0);
+  }
+
+  100% {
+    transform: translate3d(-1.75%, -1.25%, 0);
+  }
+}
+
+@keyframes cp-bg-breathe {
+  0% {
+    opacity: 0.78;
+  }
+
+  100% {
+    opacity: 0.96;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cp-page-background--ambient::before,
+  .cp-page-background--ambient::after {
+    animation: none;
+  }
 }
 
 .cp-card-light {

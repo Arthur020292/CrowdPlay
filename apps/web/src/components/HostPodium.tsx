@@ -34,7 +34,16 @@ const podiumConfig = [
   }
 ] as const;
 
+function getPodiumTitle(gameType: MatchStanding["gameType"] | undefined): string {
+  return gameType === "goldrush" ? "Richest players" : "Fastest finishers";
+}
+
+function getMetricLabel(player: MatchStanding): string {
+  return player.gameType === "goldrush" ? `${player.gold} gold` : `${player.distance.toFixed(1)}m`;
+}
+
 export function HostPodium({ standings, className = "min-h-[420px] flex-1", action }: HostPodiumProps) {
+  const gameType = standings[0]?.gameType;
   const podiumPlayers = podiumConfig
     .map((config) => ({
       ...config,
@@ -47,7 +56,7 @@ export function HostPodium({ standings, className = "min-h-[420px] flex-1", acti
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="cp-eyebrow cp-eyebrow-light">Podium</p>
-          <h2 className="mt-4 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">Top finishers</h2>
+          <h2 className="mt-4 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">{getPodiumTitle(gameType)}</h2>
         </div>
         {action}
       </div>
@@ -63,7 +72,7 @@ export function HostPodium({ standings, className = "min-h-[420px] flex-1", acti
             </div>
             <AvatarBadge avatarId={entry.player.avatarId} size={72} className="mt-4" />
             <div className="mt-4 text-xl font-black text-slate-950 sm:text-2xl">{entry.player.name}</div>
-            <div className="mt-1 text-sm font-medium text-slate-500">{entry.player.distance.toFixed(1)}m</div>
+            <div className="mt-1 text-sm font-medium text-slate-500">{getMetricLabel(entry.player)}</div>
             <div
               className={`mt-6 flex w-full items-start justify-center rounded-[1.6rem] bg-gradient-to-b px-3 pt-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] ${entry.blockClassName} ${entry.heightClassName}`.trim()}
             >

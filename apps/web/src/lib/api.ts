@@ -1,10 +1,11 @@
 import {
   createSessionResponseSchema,
   joinSessionResponseSchema,
-  type PlayerAvatarId,
+  type CreateSessionRequest,
   type CreateSessionResponse,
   type JoinSessionResponse,
-  type MatchResult
+  type MatchResult,
+  type PlayerAvatarId
 } from "@crowdplay/protocol";
 
 async function parseJson<T>(response: Response): Promise<T> {
@@ -16,12 +17,7 @@ async function parseJson<T>(response: Response): Promise<T> {
   return (await response.json()) as T;
 }
 
-export async function createSession(input: {
-  playerLimit?: number;
-  raceDurationMs?: number;
-  countdownMs?: number;
-  lockoutMs?: number;
-}): Promise<CreateSessionResponse> {
+export async function createSession(input: CreateSessionRequest): Promise<CreateSessionResponse> {
   const response = await fetch("/api/sessions", {
     method: "POST",
     headers: { "content-type": "application/json" },

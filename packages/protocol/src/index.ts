@@ -1,11 +1,22 @@
 import { z } from "zod";
 
 export const PROTOCOL_VERSION = 1;
+export const GAME_TYPES = ["goldrush", "quizdash"] as const;
 export const GAME_PHASES = ["lobby", "countdown", "live", "finished", "archived", "expired"] as const;
 export const PLAYER_STATUSES = ["connected", "disconnected", "finished", "kicked"] as const;
 export const QUESTION_FORMATS = ["mcq", "boolean"] as const;
-export const REWARD_CHOICES = ["move", "effect"] as const;
-export const RANDOM_EFFECT_TYPES = ["move", "swap", "steal", "trap"] as const;
+export const CHEST_EFFECT_TYPES = [
+  "gold_gain",
+  "gold_multiplier",
+  "gold_steal",
+  "gold_swap",
+  "gold_loss",
+  "distance_gain",
+  "distance_multiplier",
+  "distance_steal",
+  "distance_swap",
+  "distance_loss"
+] as const;
 
 export const PLAYER_AVATAR_PRESETS = [
   { id: "fox", label: "Fox", accentHex: "#f59e0b", shadowHex: "#d97706" },
@@ -25,17 +36,16 @@ const LEGACY_COLOR_TO_AVATAR = {
   pink: "panda"
 } as const;
 
+export type GameType = (typeof GAME_TYPES)[number];
 export type GamePhase = (typeof GAME_PHASES)[number];
 export type PlayerStatus = (typeof PLAYER_STATUSES)[number];
 export type PlayerAvatarId = (typeof PLAYER_AVATAR_PRESETS)[number]["id"];
 export type QuestionFormat = (typeof QUESTION_FORMATS)[number];
-export type RewardChoice = (typeof REWARD_CHOICES)[number];
-export type RandomEffectType = (typeof RANDOM_EFFECT_TYPES)[number];
+export type ChestEffectType = (typeof CHEST_EFFECT_TYPES)[number];
 
 export const playerAvatarIdSchema = z.enum(PLAYER_AVATAR_PRESETS.map((preset) => preset.id) as [PlayerAvatarId, ...PlayerAvatarId[]]);
 export const questionFormatSchema = z.enum(QUESTION_FORMATS);
-export const rewardChoiceSchema = z.enum(REWARD_CHOICES);
-export const randomEffectTypeSchema = z.enum(RANDOM_EFFECT_TYPES);
+export const chestEffectTypeSchema = z.enum(CHEST_EFFECT_TYPES);
 
 export const questionOptionSchema = z.object({
   id: z.string(),
@@ -49,53 +59,114 @@ export const publicQuestionSchema = z.object({
   options: z.array(questionOptionSchema).min(2).max(4)
 });
 
+export const targetCandidateSchema = z.object({
+  playerId: z.string(),
+  name: z.string(),
+  avatarId: playerAvatarIdSchema
+});
+
 export type QuestionOption = z.infer<typeof questionOptionSchema>;
 export type PublicQuestion = z.infer<typeof publicQuestionSchema>;
+export type TargetCandidate = z.infer<typeof targetCandidateSchema>;
 
 export const playerOutcomeSchema = z.object({
   kind: z.enum(["correct", "wrong", "reward"]),
   title: z.string(),
   detail: z.string(),
-  effectType: randomEffectTypeSchema.optional(),
+  effectType: chestEffectTypeSchema.optional(),
+  goldDelta: z.number().optional(),
   distanceDelta: z.number().optional(),
   at: z.number().int()
 });
 
 export type PlayerOutcome = z.infer<typeof playerOutcomeSchema>;
 
-export const sessionConfigSchema = z.object({
-  gameType: z.literal("quizdash").default("quizdash"),
+export type PendingGoldRushChestOutcome =
+  | { effectType: "gold_gain"; goldAmount: number }
+  | { effectType: "gold_multiplier"; multiplier: number; minimumGain: number }
+  | { effectType: "gold_steal"; percentage: number; minimumGold: number; maximumGold: number }
+  | { effectType: "gold_swap" }
+  | { effectType: "gold_loss"; percentage: number; minimumGold: number; maximumGold: number };
+
+export type PendingQuizDashChestOutcome =
+  | { effectType: "distance_gain"; distanceAmount: number }
+  | { effectType: "distance_multiplier"; multiplier: number; minimumGain: number }
+  | { effectType: "distance_steal"; percentage: number; minimumDistance: number; maximumDistance: number }
+  | { effectType: "distance_swap" }
+  | { effectType: "distance_loss"; percentage: number; minimumDistance: number; maximumDistance: number };
+
+export const goldRushSessionConfigSchema = z.object({
+  gameType: z.literal("goldrush"),
   playerLimit: z.number().int().min(2).max(50).default(50),
-  raceDurationMs: z.number().int().min(30_000).max(300_000).default(120_000),
+  matchDurationMs: z.number().int().min(30_000).max(300_000).default(120_000),
   countdownMs: z.number().int().min(1_000).max(10_000).default(3_000),
   tickRateHz: z.number().int().min(5).max(30).default(15),
   snapshotRateHz: z.number().int().min(2).max(20).default(10),
   lockoutMs: z.number().int().min(1_000).max(10_000).default(4_000)
 });
 
+export const quizDashSessionConfigSchema = z.object({
+  gameType: z.literal("quizdash"),
+  playerLimit: z.number().int().min(2).max(50).default(50),
+  raceDurationMs: z.number().int().min(30_000).max(300_000).default(120_000),
+  countdownMs: z.number().int().min(1_000).max(10_000).default(3_000),
+  tickRateHz: z.number().int().min(5).max(30).default(15),
+  snapshotRateHz: z.number().int().min(2).max(20).default(10)
+});
+
+export const sessionConfigSchema = z.discriminatedUnion("gameType", [goldRushSessionConfigSchema, quizDashSessionConfigSchema]);
+
+export type GoldRushSessionConfig = z.infer<typeof goldRushSessionConfigSchema>;
+export type QuizDashSessionConfig = z.infer<typeof quizDashSessionConfigSchema>;
 export type SessionConfig = z.infer<typeof sessionConfigSchema>;
 
-export interface SessionPlayer {
+interface BaseSessionPlayer {
   playerId: string;
   name: string;
   avatarId: PlayerAvatarId;
   joinedAt: number;
   connected: boolean;
   lastSeenAt: number;
-  distance: number;
   rank: number;
   status: PlayerStatus;
+}
+
+export interface GoldRushSessionPlayer extends BaseSessionPlayer {
+  gameType: "goldrush";
+  gold: number;
   questionCursor: number;
   questionSeed: number;
   correctAnswers: number;
   wrongAnswers: number;
-  effectCount: number;
-  distanceGained: number;
-  distanceLost: number;
+  chaosTriggerCount: number;
+  goldGained: number;
+  goldLost: number;
   lockoutUntil: number | null;
-  pendingRewardChoice: boolean;
+  pendingChestPick: boolean;
+  pendingTargetPick: boolean;
+  pendingChestOutcome: PendingGoldRushChestOutcome | null;
+  availableTargets: TargetCandidate[];
   recentOutcome: PlayerOutcome | null;
 }
+
+export interface QuizDashSessionPlayer extends BaseSessionPlayer {
+  gameType: "quizdash";
+  distance: number;
+  questionCursor: number;
+  questionSeed: number;
+  correctAnswers: number;
+  wrongAnswers: number;
+  chaosTriggerCount: number;
+  distanceGained: number;
+  distanceLost: number;
+  pendingChestPick: boolean;
+  pendingTargetPick: boolean;
+  pendingChestOutcome: PendingQuizDashChestOutcome | null;
+  availableTargets: TargetCandidate[];
+  recentOutcome: PlayerOutcome | null;
+}
+
+export type SessionPlayer = GoldRushSessionPlayer | QuizDashSessionPlayer;
 
 export interface GameSessionSummary {
   sessionId: string;
@@ -108,7 +179,20 @@ export interface GameSessionSummary {
   config: SessionConfig;
 }
 
-export interface MatchStanding {
+export interface GoldRushMatchStanding {
+  gameType: "goldrush";
+  playerId: string;
+  name: string;
+  avatarId: PlayerAvatarId;
+  rank: number;
+  gold: number;
+  correctAnswers: number;
+  wrongAnswers: number;
+  chaosTriggers: number;
+}
+
+export interface QuizDashMatchStanding {
+  gameType: "quizdash";
   playerId: string;
   name: string;
   avatarId: PlayerAvatarId;
@@ -116,10 +200,31 @@ export interface MatchStanding {
   distance: number;
   correctAnswers: number;
   wrongAnswers: number;
-  effectsTriggered: number;
 }
 
-export interface MatchResult {
+export type MatchStanding = GoldRushMatchStanding | QuizDashMatchStanding;
+
+export interface GoldRushMatchResult {
+  matchId: string;
+  sessionId: string;
+  code: string;
+  gameType: "goldrush";
+  startedAt: number;
+  endedAt: number;
+  durationMs: number;
+  playerCount: number;
+  winners: string[];
+  standings: GoldRushMatchStanding[];
+  stats: {
+    totalCorrectAnswers: number;
+    totalWrongAnswers: number;
+    totalChaosTriggers: number;
+    totalGoldInPlay: number;
+    winningGold: number;
+  };
+}
+
+export interface QuizDashMatchResult {
   matchId: string;
   sessionId: string;
   code: string;
@@ -129,27 +234,54 @@ export interface MatchResult {
   durationMs: number;
   playerCount: number;
   winners: string[];
-  standings: MatchStanding[];
+  standings: QuizDashMatchStanding[];
   stats: {
     totalCorrectAnswers: number;
     totalWrongAnswers: number;
-    totalEffectsTriggered: number;
     winningDistance: number;
   };
 }
 
-export interface SnapshotPlayer {
+export type MatchResult = GoldRushMatchResult | QuizDashMatchResult;
+
+export interface GoldRushSnapshotPlayer {
+  gameType: "goldrush";
   id: string;
   name: string;
   avatarId: PlayerAvatarId;
-  d: number;
-  r: number;
+  gold: number;
+  rank: number;
   correctAnswers: number;
   wrongAnswers: number;
   status: PlayerStatus;
 }
 
-export interface RosterPlayer {
+export interface QuizDashSnapshotPlayer {
+  gameType: "quizdash";
+  id: string;
+  name: string;
+  avatarId: PlayerAvatarId;
+  distance: number;
+  rank: number;
+  correctAnswers: number;
+  wrongAnswers: number;
+  status: PlayerStatus;
+}
+
+export type SnapshotPlayer = GoldRushSnapshotPlayer | QuizDashSnapshotPlayer;
+
+export interface GoldRushRosterPlayer {
+  gameType: "goldrush";
+  id: string;
+  name: string;
+  avatarId: PlayerAvatarId;
+  connected: boolean;
+  rank: number;
+  gold: number;
+}
+
+export interface QuizDashRosterPlayer {
+  gameType: "quizdash";
   id: string;
   name: string;
   avatarId: PlayerAvatarId;
@@ -158,12 +290,26 @@ export interface RosterPlayer {
   distance: number;
 }
 
-export const createSessionRequestSchema = z.object({
+export type RosterPlayer = GoldRushRosterPlayer | QuizDashRosterPlayer;
+
+export const createGoldRushSessionRequestSchema = z.object({
+  gameType: z.literal("goldrush"),
   playerLimit: z.number().int().min(2).max(50).optional(),
-  raceDurationMs: z.number().int().min(30_000).max(300_000).optional(),
+  matchDurationMs: z.number().int().min(30_000).max(300_000).optional(),
   countdownMs: z.number().int().min(1_000).max(10_000).optional(),
   lockoutMs: z.number().int().min(1_000).max(10_000).optional()
 });
+
+export const createQuizDashSessionRequestSchema = z.object({
+  gameType: z.literal("quizdash"),
+  playerLimit: z.number().int().min(2).max(50).optional(),
+  raceDurationMs: z.number().int().min(30_000).max(300_000).optional(),
+  countdownMs: z.number().int().min(1_000).max(10_000).optional()
+});
+
+export const createSessionRequestSchema = z.discriminatedUnion("gameType", [createGoldRushSessionRequestSchema, createQuizDashSessionRequestSchema]);
+
+export type CreateSessionRequest = z.infer<typeof createSessionRequestSchema>;
 
 export const joinSessionRequestSchema = z.object({
   name: z.string().trim().min(1).max(24),
@@ -213,10 +359,24 @@ export const clientAnswerEventSchema = z.object({
   answerId: z.string()
 });
 
-export const clientRewardChoiceEventSchema = z.object({
+export const clientChestPickEventSchema = z.object({
   v: z.literal(PROTOCOL_VERSION),
-  type: z.literal("reward_choice"),
-  choice: rewardChoiceSchema
+  type: z.literal("chest_pick"),
+  chestIndex: z.union([z.literal(0), z.literal(1), z.literal(2)])
+});
+
+export const clientTargetPickEventSchema = z.object({
+  v: z.literal(PROTOCOL_VERSION),
+  type: z.literal("target_pick"),
+  targetPlayerId: z.string()
+});
+
+export const clientInputEventSchema = z.object({
+  v: z.literal(PROTOCOL_VERSION),
+  type: z.literal("input"),
+  seq: z.number().int().nonnegative(),
+  tapCount: z.number().int().min(0).max(100),
+  windowMs: z.number().int().min(10).max(1_000)
 });
 
 export const clientHostCommandEventSchema = z.object({
@@ -233,7 +393,9 @@ export const clientPingEventSchema = z.object({
 
 export const clientEventSchema = z.discriminatedUnion("type", [
   clientAnswerEventSchema,
-  clientRewardChoiceEventSchema,
+  clientChestPickEventSchema,
+  clientTargetPickEventSchema,
+  clientInputEventSchema,
   clientHostCommandEventSchema,
   clientPingEventSchema
 ]);
@@ -253,6 +415,7 @@ export type JoinAckEvent = {
 export type RosterUpdateEvent = {
   v: typeof PROTOCOL_VERSION;
   type: "roster_update";
+  gameType: GameType;
   players: RosterPlayer[];
 };
 
@@ -264,39 +427,105 @@ export type PhaseChangedEvent = {
   remainingMs?: number;
 };
 
-export type SnapshotEvent = {
+export type GoldRushSnapshotEvent = {
   v: typeof PROTOCOL_VERSION;
   type: "snapshot";
+  gameType: "goldrush";
   phase: GamePhase;
   tick: number;
   serverTimeMs: number;
   remainingMs: number;
-  players: SnapshotPlayer[];
+  players: GoldRushSnapshotPlayer[];
 };
 
-export type PlayerStateEvent = {
+export type QuizDashSnapshotEvent = {
+  v: typeof PROTOCOL_VERSION;
+  type: "snapshot";
+  gameType: "quizdash";
+  phase: GamePhase;
+  tick: number;
+  serverTimeMs: number;
+  remainingMs: number;
+  players: QuizDashSnapshotPlayer[];
+};
+
+export type SnapshotEvent = GoldRushSnapshotEvent | QuizDashSnapshotEvent;
+
+export type GoldRushPlayerStateEvent = {
   v: typeof PROTOCOL_VERSION;
   type: "player_state";
+  gameType: "goldrush";
   phase: GamePhase;
   playerId: string;
-  distance: number;
+  gold: number;
   rank: number;
   correctAnswers: number;
   wrongAnswers: number;
-  effectsTriggered: number;
+  chaosTriggers: number;
   lockoutEndsAt: number | null;
-  pendingRewardChoice: boolean;
+  pendingChestPick: boolean;
+  pendingTargetPick: boolean;
+  availableTargets: TargetCandidate[];
   currentQuestion: PublicQuestion | null;
   recentOutcome: PlayerOutcome | null;
 };
 
-export type MatchFinishedEvent = {
+export type QuizDashPlayerStateEvent = {
+  v: typeof PROTOCOL_VERSION;
+  type: "player_state";
+  gameType: "quizdash";
+  phase: GamePhase;
+  playerId: string;
+  pendingChestPick: boolean;
+  pendingTargetPick: boolean;
+  availableTargets: TargetCandidate[];
+  currentQuestion: PublicQuestion | null;
+  recentOutcome: PlayerOutcome | null;
+};
+
+export type PlayerStateEvent = GoldRushPlayerStateEvent | QuizDashPlayerStateEvent;
+
+export type ChaosEvent = {
+  v: typeof PROTOCOL_VERSION;
+  type: "chaos_event";
+  gameType: "goldrush";
+  actor: {
+    playerId: string;
+    name: string;
+    avatarId: PlayerAvatarId;
+    rank: number;
+    gold: number;
+  };
+  target?: {
+    playerId: string;
+    name: string;
+    avatarId: PlayerAvatarId;
+    rank: number;
+    gold: number;
+  };
+  outcome: PlayerOutcome;
+  at: number;
+};
+
+export type GoldRushMatchFinishedEvent = {
   v: typeof PROTOCOL_VERSION;
   type: "match_finished";
+  gameType: "goldrush";
   matchId: string;
   winners: string[];
-  standings: MatchStanding[];
+  standings: GoldRushMatchStanding[];
 };
+
+export type QuizDashMatchFinishedEvent = {
+  v: typeof PROTOCOL_VERSION;
+  type: "match_finished";
+  gameType: "quizdash";
+  matchId: string;
+  winners: string[];
+  standings: QuizDashMatchStanding[];
+};
+
+export type MatchFinishedEvent = GoldRushMatchFinishedEvent | QuizDashMatchFinishedEvent;
 
 export type ErrorEvent = {
   v: typeof PROTOCOL_VERSION;
@@ -317,19 +546,33 @@ export type ServerEvent =
   | PhaseChangedEvent
   | SnapshotEvent
   | PlayerStateEvent
+  | ChaosEvent
   | MatchFinishedEvent
   | ErrorEvent
   | PongEvent;
 
-export const defaultSessionConfig: SessionConfig = {
-  gameType: "quizdash",
+export const defaultGoldRushSessionConfig: GoldRushSessionConfig = {
+  gameType: "goldrush",
   playerLimit: 50,
-  raceDurationMs: 120_000,
+  matchDurationMs: 120_000,
   countdownMs: 3_000,
   tickRateHz: 15,
   snapshotRateHz: 10,
   lockoutMs: 4_000
 };
+
+export const defaultQuizDashSessionConfig: QuizDashSessionConfig = {
+  gameType: "quizdash",
+  playerLimit: 50,
+  raceDurationMs: 120_000,
+  countdownMs: 3_000,
+  tickRateHz: 15,
+  snapshotRateHz: 10
+};
+
+export function getDefaultSessionConfig(gameType: GameType): SessionConfig {
+  return gameType === "goldrush" ? defaultGoldRushSessionConfig : defaultQuizDashSessionConfig;
+}
 
 export function parseClientEvent(payload: unknown): ClientEvent {
   return clientEventSchema.parse(payload);
@@ -365,6 +608,22 @@ export function coercePlayerAvatarId(value: unknown, fallbackIndex = 0): PlayerA
   }
 
   return getDefaultPlayerAvatar(fallbackIndex);
+}
+
+export function isGoldRushConfig(config: SessionConfig): config is GoldRushSessionConfig {
+  return config.gameType === "goldrush";
+}
+
+export function isQuizDashConfig(config: SessionConfig): config is QuizDashSessionConfig {
+  return config.gameType === "quizdash";
+}
+
+export function isGoldRushPlayer(player: SessionPlayer): player is GoldRushSessionPlayer {
+  return player.gameType === "goldrush";
+}
+
+export function isQuizDashPlayer(player: SessionPlayer): player is QuizDashSessionPlayer {
+  return player.gameType === "quizdash";
 }
 
 export function safeParseServerEvent(payload: unknown): ServerEvent | null {

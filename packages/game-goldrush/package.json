@@ -1,5 +1,5 @@
 {
-  "name": "@crowdplay/game-quizdash",
+  "name": "@crowdplay/game-goldrush",
   "version": "0.1.0",
   "type": "module",
   "main": "./src/index.ts",
@@ -10,7 +10,6 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@crowdplay/game-goldrush": "0.1.0",
     "@crowdplay/protocol": "0.1.0"
   },
   "devDependencies": {

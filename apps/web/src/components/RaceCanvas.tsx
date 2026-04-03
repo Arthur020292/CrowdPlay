@@ -1,19 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import type { SnapshotEvent } from "@crowdplay/protocol";
+import type { QuizDashSnapshotEvent } from "@crowdplay/protocol";
 
 import { AvatarBadge } from "./AvatarBadge";
 
 interface RaceCanvasProps {
-  snapshot: SnapshotEvent | null;
-  previousSnapshot: SnapshotEvent | null;
+  snapshot: QuizDashSnapshotEvent | null;
+  previousSnapshot: QuizDashSnapshotEvent | null;
   className?: string;
   lanePlayerIds?: string[];
 }
 
 interface AvatarPosition {
   id: string;
-  avatarId: SnapshotEvent["players"][number]["avatarId"];
+  avatarId: QuizDashSnapshotEvent["players"][number]["avatarId"];
+  name: string;
+  distance: number;
   x: number;
   y: number;
   size: number;
@@ -25,7 +27,7 @@ export function RaceCanvas({ snapshot, previousSnapshot, className = "h-[360px]"
   const [laneOrder, setLaneOrder] = useState<string[]>([]);
 
   const maxDistance = useMemo(() => {
-    const current = snapshot?.players.reduce((best, player) => Math.max(best, player.d), 0) ?? 0;
+    const current = snapshot?.players.reduce((best, player) => Math.max(best, player.distance), 0) ?? 0;
     return Math.max(150, current + 20);
   }, [snapshot]);
 
@@ -60,7 +62,7 @@ export function RaceCanvas({ snapshot, previousSnapshot, className = "h-[360px]"
 
     const playerById = new Map(snapshot.players.map((player) => [player.id, player]));
     const preferredOrder = lanePlayerIds?.length ? lanePlayerIds : laneOrder;
-    const ordered = preferredOrder.map((id) => playerById.get(id)).filter((player): player is SnapshotEvent["players"][number] => Boolean(player));
+    const ordered = preferredOrder.map((id) => playerById.get(id)).filter((player): player is QuizDashSnapshotEvent["players"][number] => Boolean(player));
 
     if (ordered.length === snapshot.players.length) {
       return ordered;
@@ -108,8 +110,6 @@ export function RaceCanvas({ snapshot, previousSnapshot, className = "h-[360px]"
       const trackOffsetYCss = trackOffsetY / devicePixelRatio;
       const avatarSizePx = Math.max(Math.min(laneHeight * 0.78, 40 * devicePixelRatio), 12 * devicePixelRatio);
       const avatarSizeCss = avatarSizePx / devicePixelRatio;
-      const labelFontSizePx = Math.max(Math.min(laneHeight * 0.42, 14 * devicePixelRatio), 8 * devicePixelRatio);
-      const distanceOffsetPx = Math.max(avatarSizePx / 2 + 10 * devicePixelRatio, 22 * devicePixelRatio);
       const alpha = Math.min((Date.now() - snapshot.serverTimeMs) / 120, 1.2);
 
       context.clearRect(0, 0, widthPx, heightPx);
@@ -141,7 +141,7 @@ export function RaceCanvas({ snapshot, previousSnapshot, className = "h-[360px]"
 
       orderedPlayers.forEach((player, index) => {
         const previous = previousPlayers.get(player.id);
-        const blendedDistance = previous ? previous.d + (player.d - previous.d) * alpha : player.d;
+        const blendedDistance = previous ? previous.distance + (player.distance - previous.distance) * alpha : player.distance;
         const laneTop = trackOffsetY + laneHeight * index;
         const y = laneTop + laneHeight / 2;
         const x = 24 * devicePixelRatio + (blendedDistance / maxDistance) * (widthPx - 80 * devicePixelRatio);
@@ -151,16 +151,12 @@ export function RaceCanvas({ snapshot, previousSnapshot, className = "h-[360px]"
         nextAvatarPositions.push({
           id: player.id,
           avatarId: player.avatarId,
+          name: player.name,
+          distance: blendedDistance,
           x: xCss,
           y: yCss,
           size: avatarSizeCss
         });
-
-        context.fillStyle = "#e2e8f0";
-        context.font = `${Math.round(labelFontSizePx)}px sans-serif`;
-        context.textBaseline = "middle";
-        context.fillText(`${player.r}. ${player.name}`, 18 * devicePixelRatio, y);
-        context.fillText(`${player.d.toFixed(1)}m`, x + distanceOffsetPx, y);
       });
 
       setAvatarPositions(nextAvatarPositions);
@@ -183,10 +179,15 @@ export function RaceCanvas({ snapshot, previousSnapshot, className = "h-[360px]"
             style={{
               left: `${player.x}px`,
               top: `${player.y}px`,
-              transform: "translate(-50%, -50%)"
+              transform: "translateY(-50%)"
             }}
           >
-            <AvatarBadge avatarId={player.avatarId} size={player.size} />
+            <div className="flex items-center gap-2">
+              <AvatarBadge avatarId={player.avatarId} size={player.size} />
+              <span className="whitespace-nowrap text-sm font-semibold text-slate-100">
+                {player.name}: {player.distance.toFixed(1)}m
+              </span>
+            </div>
           </div>
         ))}
       </div>

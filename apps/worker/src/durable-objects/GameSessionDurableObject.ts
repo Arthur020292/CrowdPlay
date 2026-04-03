@@ -1,19 +1,37 @@
 import { DurableObject } from "cloudflare:workers";
 
 import {
-  applyRewardChoice,
-  buildStandings,
+  buildStandings as buildGoldRushStandings,
   clearExpiredLockout,
-  evaluateAnswer,
-  getQuestionForPlayer,
+  createChestOutcome as createGoldRushChestOutcome,
+  evaluateAnswer as evaluateGoldRushAnswer,
+  getQuestionForPlayer as getGoldRushQuestionForPlayer,
+  getTopOpponentTargets as getGoldRushTopOpponentTargets,
   isLockoutActive,
-  syncRanks
+  requiresTarget as goldRushRequiresTarget,
+  resolveChestOutcome as resolveGoldRushChestOutcome,
+  syncRanks as syncGoldRushRanks
+} from "@crowdplay/game-goldrush";
+import {
+  buildStandings as buildQuizDashStandings,
+  createChestOutcome as createQuizDashChestOutcome,
+  evaluateAnswer as evaluateQuizDashAnswer,
+  getQuestionForPlayer as getQuizDashQuestionForPlayer,
+  getTopOpponentTargets as getQuizDashTopOpponentTargets,
+  requiresTarget as quizDashRequiresTarget,
+  resolveChestOutcome as resolveQuizDashChestOutcome,
+  syncRanks as syncQuizDashRanks
 } from "@crowdplay/game-quizdash";
 import {
   PROTOCOL_VERSION,
   coercePlayerAvatarId,
-  defaultSessionConfig,
+  getDefaultSessionConfig,
+  isGoldRushConfig,
+  isGoldRushPlayer,
+  isQuizDashConfig,
+  isQuizDashPlayer,
   parseClientEvent,
+  type ChaosEvent,
   type GamePhase,
   type MatchResult,
   type PlayerStateEvent,
@@ -31,14 +49,14 @@ type SocketAttachment =
   | { role: "host"; sessionId: string }
   | { role: "player"; sessionId: string; playerId: string };
 
-const STORAGE_KEY = "session-state";
+const STORAGE_KEY = "session-state-v3";
 const EXPIRY_MS = 30 * 60 * 1000;
 
 export class GameSessionDurableObject extends DurableObject<Env> {
   private sessionId = "";
   private code = "";
   private phase: GamePhase = "expired";
-  private config: SessionConfig = defaultSessionConfig;
+  private config: SessionConfig = getDefaultSessionConfig("goldrush");
   private createdAt = 0;
   private startedAt: number | null = null;
   private endedAt: number | null = null;
@@ -144,18 +162,55 @@ export class GameSessionDurableObject extends DurableObject<Env> {
     }
 
     player.connected = true;
+    player.status = "connected";
     player.lastSeenAt = now;
-    clearExpiredLockout(player, now);
+
+    if (isGoldRushPlayer(player)) {
+      clearExpiredLockout(player, now);
+
+      if (event.type === "input") {
+        this.send(ws, { v: PROTOCOL_VERSION, type: "error", code: "INVALID_FOR_GAME", message: "Tap input is not used in Gold Rush." });
+        return;
+      }
+
+      if (event.type === "answer") {
+        await this.handleGoldRushAnswer(player, event.questionId, event.answerId);
+        return;
+      }
+
+      if (event.type === "chest_pick") {
+        await this.handleGoldRushChestPick(player, event.chestIndex);
+        return;
+      }
+
+      if (event.type === "target_pick") {
+        await this.handleGoldRushTargetPick(player, event.targetPlayerId);
+      }
+
+      return;
+    }
+
+    if (event.type === "input") {
+      this.send(ws, { v: PROTOCOL_VERSION, type: "error", code: "INVALID_FOR_GAME", message: "Tap input is not used in QuizDash." });
+      return;
+    }
 
     if (event.type === "answer") {
-      await this.handlePlayerAnswer(player, event.questionId, event.answerId);
+      await this.handleQuizDashAnswer(player, event.questionId, event.answerId);
       return;
     }
 
-    if (event.type === "reward_choice") {
-      await this.handleRewardChoice(player, event.choice);
+    if (event.type === "chest_pick") {
+      await this.handleQuizDashChestPick(player, event.chestIndex);
       return;
     }
+
+    if (event.type === "target_pick") {
+      await this.handleQuizDashTargetPick(player, event.targetPlayerId);
+      return;
+    }
+
+    this.send(ws, { v: PROTOCOL_VERSION, type: "error", code: "INVALID_FOR_GAME", message: "QuizDash only accepts answer and chest events." });
   }
 
   async webSocketClose(ws: WebSocket): Promise<void> {
@@ -171,6 +226,7 @@ export class GameSessionDurableObject extends DurableObject<Env> {
         const player = this.players.get(attachment.playerId);
         if (player) {
           player.connected = false;
+          player.status = this.phase === "finished" ? "finished" : "disconnected";
           player.lastSeenAt = Date.now();
         }
       }
@@ -178,6 +234,7 @@ export class GameSessionDurableObject extends DurableObject<Env> {
 
     await this.persistState(true);
     this.broadcastRoster();
+    this.broadcastPlayerStates();
   }
 
   async alarm(): Promise<void> {
@@ -228,26 +285,55 @@ export class GameSessionDurableObject extends DurableObject<Env> {
     this.liveEndsAt = persisted.liveEndsAt;
     this.tick = persisted.tick;
     this.config = persisted.config;
-    this.lastResult = persisted.lastResult
-      ? {
-          ...persisted.lastResult,
-          standings: persisted.lastResult.standings.map((standing, index) => ({
-            ...standing,
-            avatarId: coercePlayerAvatarId(standing.avatarId ?? (standing as { color?: string }).color, index)
-          }))
-        }
-      : null;
+    this.lastResult = persisted.lastResult ? this.restoreMatchResult(persisted.lastResult) : null;
 
     this.players = new Map(
-      persisted.players.map((player, index) => [
-        player.playerId,
-        {
-          ...player,
-          avatarId: coercePlayerAvatarId(player.avatarId ?? (player as { color?: string }).color, index),
-          status: player.connected ? "connected" : player.status
-        }
-      ])
+      persisted.players.map((player, index) => [player.playerId, this.restorePlayer(player, index)])
     );
+  }
+
+  private restorePlayer(player: SessionPlayer, index: number): SessionPlayer {
+    if (isGoldRushPlayer(player)) {
+      return {
+        ...player,
+        avatarId: coercePlayerAvatarId(player.avatarId, index),
+        availableTargets: player.availableTargets.map((target, targetIndex) => ({
+          ...target,
+          avatarId: coercePlayerAvatarId(target.avatarId, targetIndex)
+        })),
+        status: player.connected ? "connected" : player.status
+      };
+    }
+
+    return {
+      ...player,
+      avatarId: coercePlayerAvatarId(player.avatarId, index),
+      availableTargets: player.availableTargets.map((target, targetIndex) => ({
+        ...target,
+        avatarId: coercePlayerAvatarId(target.avatarId, targetIndex)
+      })),
+      status: player.connected ? "connected" : player.status
+    };
+  }
+
+  private restoreMatchResult(result: MatchResult): MatchResult {
+    if (result.gameType === "goldrush") {
+      return {
+        ...result,
+        standings: result.standings.map((standing, index) => ({
+          ...standing,
+          avatarId: coercePlayerAvatarId(standing.avatarId ?? (standing as { color?: string }).color, index)
+        }))
+      };
+    }
+
+    return {
+      ...result,
+      standings: result.standings.map((standing, index) => ({
+        ...standing,
+        avatarId: coercePlayerAvatarId(standing.avatarId ?? (standing as { color?: string }).color, index)
+      }))
+    };
   }
 
   private rehydrateSockets(): void {
@@ -268,6 +354,7 @@ export class GameSessionDurableObject extends DurableObject<Env> {
       const player = this.players.get(attachment.playerId);
       if (player) {
         player.connected = true;
+        player.status = "connected";
         player.lastSeenAt = Date.now();
       }
     }
@@ -294,14 +381,14 @@ export class GameSessionDurableObject extends DurableObject<Env> {
     const payload = (await request.json()) as {
       sessionId: string;
       code: string;
-      config?: Partial<SessionConfig>;
+      config: SessionConfig;
     };
 
     this.sessionId = payload.sessionId;
     this.code = payload.code;
     this.phase = "lobby";
     this.createdAt = Date.now();
-    this.config = { ...defaultSessionConfig, ...payload.config };
+    this.config = { ...getDefaultSessionConfig(payload.config.gameType), ...payload.config } as SessionConfig;
     this.players = new Map();
     this.lastResult = null;
     this.tick = 0;
@@ -326,30 +413,59 @@ export class GameSessionDurableObject extends DurableObject<Env> {
     const payload = (await request.json()) as { name: string; avatarId?: string; color?: string; playerId: string };
     const now = Date.now();
 
-    const player: SessionPlayer = {
-      playerId: payload.playerId,
-      name: payload.name.trim(),
-      avatarId: coercePlayerAvatarId(payload.avatarId ?? payload.color, this.players.size),
-      joinedAt: now,
-      connected: false,
-      lastSeenAt: now,
-      distance: 0,
-      rank: this.players.size + 1,
-      status: "connected",
-      questionCursor: 0,
-      questionSeed: this.players.size,
-      correctAnswers: 0,
-      wrongAnswers: 0,
-      effectCount: 0,
-      distanceGained: 0,
-      distanceLost: 0,
-      lockoutUntil: null,
-      pendingRewardChoice: false,
-      recentOutcome: null
-    };
+    const player = isGoldRushConfig(this.config)
+      ? ({
+          gameType: "goldrush",
+          playerId: payload.playerId,
+          name: payload.name.trim(),
+          avatarId: coercePlayerAvatarId(payload.avatarId ?? payload.color, this.players.size),
+          joinedAt: now,
+          connected: false,
+          lastSeenAt: now,
+          gold: 0,
+          rank: this.players.size + 1,
+          status: "connected",
+          questionCursor: 0,
+          questionSeed: this.players.size,
+          correctAnswers: 0,
+          wrongAnswers: 0,
+          chaosTriggerCount: 0,
+          goldGained: 0,
+          goldLost: 0,
+          lockoutUntil: null,
+          pendingChestPick: false,
+          pendingTargetPick: false,
+          pendingChestOutcome: null,
+          availableTargets: [],
+          recentOutcome: null
+        } satisfies SessionPlayer)
+      : ({
+          gameType: "quizdash",
+          playerId: payload.playerId,
+          name: payload.name.trim(),
+          avatarId: coercePlayerAvatarId(payload.avatarId ?? payload.color, this.players.size),
+          joinedAt: now,
+          connected: false,
+          lastSeenAt: now,
+          distance: 0,
+          questionCursor: 0,
+          questionSeed: this.players.size,
+          correctAnswers: 0,
+          wrongAnswers: 0,
+          chaosTriggerCount: 0,
+          distanceGained: 0,
+          distanceLost: 0,
+          pendingChestPick: false,
+          pendingTargetPick: false,
+          pendingChestOutcome: null,
+          availableTargets: [],
+          recentOutcome: null,
+          rank: this.players.size + 1,
+          status: "connected"
+        } satisfies SessionPlayer);
 
     this.players.set(player.playerId, player);
-    syncRanks([...this.players.values()]);
+    this.syncRanksForCurrentGame();
     await this.persistState(true);
     this.broadcastRoster();
 
@@ -465,28 +581,158 @@ export class GameSessionDurableObject extends DurableObject<Env> {
     this.scheduleLoop();
   }
 
-  private async handlePlayerAnswer(player: SessionPlayer, questionId: string, answerId: string): Promise<void> {
-    const now = Date.now();
-    clearExpiredLockout(player, now);
-
-    if (this.phase !== "live" || player.pendingRewardChoice || isLockoutActive(player, now)) {
+  private async handleQuizDashAnswer(player: SessionPlayer, questionId: string, answerId: string): Promise<void> {
+    if (!isQuizDashPlayer(player)) {
       return;
     }
 
-    const isCorrect = evaluateAnswer(player, questionId, answerId);
+    if (this.phase !== "live" || player.pendingChestPick || player.pendingTargetPick) {
+      return;
+    }
+
+    const isCorrect = evaluateQuizDashAnswer(player, questionId, answerId);
     if (isCorrect) {
       player.correctAnswers += 1;
-      player.pendingRewardChoice = true;
+      player.pendingChestPick = true;
+      player.pendingTargetPick = false;
+      player.pendingChestOutcome = null;
+      player.availableTargets = [];
       player.recentOutcome = {
         kind: "correct",
         title: "Correct",
-        detail: "Choose your reward: safe progress or a chaotic chest.",
+        detail: "Pick 1 of 3 hidden chests.",
+        at: Date.now()
+      };
+    } else {
+      player.wrongAnswers += 1;
+      player.pendingChestPick = false;
+      player.pendingTargetPick = false;
+      player.pendingChestOutcome = null;
+      player.availableTargets = [];
+      player.recentOutcome = {
+        kind: "wrong",
+        title: "Missed it",
+        detail: "No boost this round. Next question coming up.",
+        at: Date.now()
+      };
+      player.questionCursor += 1;
+    }
+
+    syncQuizDashRanks(this.quizDashPlayers());
+    this.broadcastSnapshot(true);
+    this.broadcastPlayerStates();
+    await this.persistState(false);
+  }
+
+  private async handleQuizDashChestPick(player: SessionPlayer, chestIndex: number): Promise<void> {
+    if (!isQuizDashPlayer(player)) {
+      return;
+    }
+
+    if (this.phase !== "live" || !player.pendingChestPick || player.pendingTargetPick) {
+      return;
+    }
+
+    const outcome = createQuizDashChestOutcome(player, chestIndex, `${this.sessionId}:${player.playerId}:${player.questionCursor}`);
+    player.pendingChestPick = false;
+
+    if (quizDashRequiresTarget(outcome)) {
+      const availableTargets = getQuizDashTopOpponentTargets(this.quizDashPlayers().filter((candidate) => candidate.connected), player);
+
+      if (availableTargets.length === 0) {
+        await this.finalizeQuizDashResolution(player, resolveQuizDashChestOutcome(this.quizDashPlayers(), player, { effectType: "distance_gain", distanceAmount: 20 }));
+        return;
+      }
+
+      player.pendingTargetPick = true;
+      player.pendingChestOutcome = outcome;
+      player.availableTargets = availableTargets;
+      player.recentOutcome = {
+        kind: "reward",
+        title: outcome.effectType === "distance_steal" ? "Heist chest" : "Swap chest",
+        detail: outcome.effectType === "distance_steal" ? "Pick 1 of the top racers to steal from." : "Pick 1 of the top racers to swap with.",
+        effectType: outcome.effectType,
+        at: Date.now()
+      };
+      this.broadcastPlayerStates();
+      await this.persistState(false);
+      return;
+    }
+
+    await this.finalizeQuizDashResolution(player, resolveQuizDashChestOutcome(this.quizDashPlayers(), player, outcome));
+  }
+
+  private async handleQuizDashTargetPick(player: SessionPlayer, targetPlayerId: string): Promise<void> {
+    if (!isQuizDashPlayer(player)) {
+      return;
+    }
+
+    if (this.phase !== "live" || !player.pendingTargetPick || !player.pendingChestOutcome) {
+      return;
+    }
+
+    const latestTargets = getQuizDashTopOpponentTargets(this.quizDashPlayers().filter((candidate) => candidate.connected), player);
+    const resolvedTargetId = latestTargets.some((target) => target.playerId === targetPlayerId) ? targetPlayerId : undefined;
+    await this.finalizeQuizDashResolution(
+      player,
+      resolveQuizDashChestOutcome(this.quizDashPlayers(), player, player.pendingChestOutcome, resolvedTargetId)
+    );
+  }
+
+  private async finalizeQuizDashResolution(
+    player: SessionPlayer,
+    resolution: ReturnType<typeof resolveQuizDashChestOutcome>
+  ): Promise<void> {
+    if (!isQuizDashPlayer(player)) {
+      return;
+    }
+
+    player.pendingChestPick = false;
+    player.pendingTargetPick = false;
+    player.pendingChestOutcome = null;
+    player.availableTargets = [];
+    player.questionCursor += 1;
+    player.recentOutcome = resolution.outcome;
+
+    syncQuizDashRanks(this.quizDashPlayers());
+    this.broadcastSnapshot(true);
+    this.broadcastPlayerStates();
+    await this.persistState(false);
+  }
+
+  private async handleGoldRushAnswer(player: SessionPlayer, questionId: string, answerId: string): Promise<void> {
+    if (!isGoldRushPlayer(player) || !isGoldRushConfig(this.config)) {
+      return;
+    }
+
+    const now = Date.now();
+    clearExpiredLockout(player, now);
+
+    if (this.phase !== "live" || player.pendingChestPick || player.pendingTargetPick || isLockoutActive(player, now)) {
+      return;
+    }
+
+    const isCorrect = evaluateGoldRushAnswer(player, questionId, answerId);
+    if (isCorrect) {
+      player.correctAnswers += 1;
+      player.pendingChestPick = true;
+      player.pendingTargetPick = false;
+      player.pendingChestOutcome = null;
+      player.availableTargets = [];
+      player.recentOutcome = {
+        kind: "correct",
+        title: "Correct",
+        detail: "Pick 1 of 3 hidden chests.",
         at: now
       };
     } else {
       player.wrongAnswers += 1;
       player.lockoutUntil = now + this.config.lockoutMs;
       player.questionCursor += 1;
+      player.pendingChestPick = false;
+      player.pendingTargetPick = false;
+      player.pendingChestOutcome = null;
+      player.availableTargets = [];
       player.recentOutcome = {
         kind: "wrong",
         title: "Locked out",
@@ -495,35 +741,119 @@ export class GameSessionDurableObject extends DurableObject<Env> {
       };
     }
 
-    syncRanks([...this.players.values()]);
+    syncGoldRushRanks(this.goldRushPlayers());
     this.broadcastSnapshot(true);
     this.broadcastPlayerStates();
     await this.persistState(false);
   }
 
-  private async handleRewardChoice(player: SessionPlayer, choice: "move" | "effect"): Promise<void> {
-    const now = Date.now();
-    clearExpiredLockout(player, now);
-
-    if (this.phase !== "live" || !player.pendingRewardChoice) {
+  private async handleGoldRushChestPick(player: SessionPlayer, chestIndex: number): Promise<void> {
+    if (!isGoldRushPlayer(player) || !isGoldRushConfig(this.config)) {
       return;
     }
 
-    const resolution = applyRewardChoice(
-      [...this.players.values()],
-      player,
-      choice,
-      `${this.sessionId}:${player.playerId}:${player.questionCursor}:${this.tick}`
-    );
+    if (this.phase !== "live" || !player.pendingChestPick || player.pendingTargetPick) {
+      return;
+    }
 
-    player.pendingRewardChoice = false;
+    const outcome = createGoldRushChestOutcome(player, chestIndex, `${this.sessionId}:${player.playerId}:${player.questionCursor}`);
+    player.pendingChestPick = false;
+
+    if (goldRushRequiresTarget(outcome)) {
+      const availableTargets = getGoldRushTopOpponentTargets(this.goldRushPlayers().filter((candidate) => candidate.connected), player);
+
+      if (availableTargets.length === 0) {
+        await this.finalizeGoldRushResolution(player, resolveGoldRushChestOutcome(this.goldRushPlayers(), player, { effectType: "gold_gain", goldAmount: 50 }));
+        return;
+      }
+
+      player.pendingTargetPick = true;
+      player.pendingChestOutcome = outcome;
+      player.availableTargets = availableTargets;
+      player.recentOutcome = {
+        kind: "reward",
+        title: outcome.effectType === "gold_steal" ? "Heist chest" : "Swap chest",
+        detail: outcome.effectType === "gold_steal" ? "Pick 1 of the top vaults to rob." : "Pick 1 of the top vaults to swap with.",
+        effectType: outcome.effectType,
+        at: Date.now()
+      };
+      this.broadcastPlayerStates();
+      await this.persistState(false);
+      return;
+    }
+
+    await this.finalizeGoldRushResolution(player, resolveGoldRushChestOutcome(this.goldRushPlayers(), player, outcome));
+  }
+
+  private async handleGoldRushTargetPick(player: SessionPlayer, targetPlayerId: string): Promise<void> {
+    if (!isGoldRushPlayer(player)) {
+      return;
+    }
+
+    if (this.phase !== "live" || !player.pendingTargetPick || !player.pendingChestOutcome) {
+      return;
+    }
+
+    const latestTargets = getGoldRushTopOpponentTargets(this.goldRushPlayers().filter((candidate) => candidate.connected), player);
+    const resolvedTargetId = latestTargets.some((target) => target.playerId === targetPlayerId) ? targetPlayerId : undefined;
+    await this.finalizeGoldRushResolution(
+      player,
+      resolveGoldRushChestOutcome(this.goldRushPlayers(), player, player.pendingChestOutcome, resolvedTargetId)
+    );
+  }
+
+  private async finalizeGoldRushResolution(
+    player: SessionPlayer,
+    resolution: ReturnType<typeof resolveGoldRushChestOutcome>
+  ): Promise<void> {
+    if (!isGoldRushPlayer(player)) {
+      return;
+    }
+
+    player.pendingChestPick = false;
+    player.pendingTargetPick = false;
+    player.pendingChestOutcome = null;
+    player.availableTargets = [];
     player.questionCursor += 1;
     player.recentOutcome = resolution.outcome;
 
-    syncRanks([...this.players.values()]);
+    syncGoldRushRanks(this.goldRushPlayers());
     this.broadcastSnapshot(true);
     this.broadcastPlayerStates();
+    this.broadcastChaosEvent(player, resolution.target, resolution.outcome);
     await this.persistState(false);
+  }
+
+  private broadcastChaosEvent(player: SessionPlayer, target: SessionPlayer | null, outcome: ChaosEvent["outcome"]): void {
+    if (!isGoldRushPlayer(player)) {
+      return;
+    }
+
+    const event: ChaosEvent = {
+      v: PROTOCOL_VERSION,
+      type: "chaos_event",
+      gameType: "goldrush",
+      actor: {
+        playerId: player.playerId,
+        name: player.name,
+        avatarId: player.avatarId,
+        rank: player.rank,
+        gold: player.gold
+      },
+      target: target && isGoldRushPlayer(target)
+        ? {
+            playerId: target.playerId,
+            name: target.name,
+            avatarId: target.avatarId,
+            rank: target.rank,
+            gold: target.gold
+          }
+        : undefined,
+      outcome,
+      at: outcome.at
+    };
+
+    this.broadcast(event);
   }
 
   private async finishMatch(): Promise<void> {
@@ -534,36 +864,74 @@ export class GameSessionDurableObject extends DurableObject<Env> {
     this.phase = "finished";
     this.endedAt = Date.now();
 
-    for (const player of this.players.values()) {
-      player.pendingRewardChoice = false;
-      player.lockoutUntil = null;
-      player.status = "finished";
-    }
-
-    const standings = buildStandings([...this.players.values()]);
-    const winners = standings.slice(0, 3).map((standing) => standing.playerId);
-    const totalCorrectAnswers = standings.reduce((sum, standing) => sum + standing.correctAnswers, 0);
-    const totalWrongAnswers = standings.reduce((sum, standing) => sum + standing.wrongAnswers, 0);
-    const totalEffectsTriggered = standings.reduce((sum, standing) => sum + standing.effectsTriggered, 0);
-
-    this.lastResult = {
-      matchId: createId("match"),
-      sessionId: this.sessionId,
-      code: this.code,
-      gameType: "quizdash",
-      startedAt: this.startedAt ?? this.createdAt,
-      endedAt: this.endedAt,
-      durationMs: (this.startedAt ? this.endedAt - this.startedAt : 0) || 0,
-      playerCount: standings.length,
-      winners,
-      standings,
-      stats: {
-        totalCorrectAnswers,
-        totalWrongAnswers,
-        totalEffectsTriggered,
-        winningDistance: standings[0]?.distance ?? 0
+    if (isGoldRushConfig(this.config)) {
+      for (const player of this.goldRushPlayers()) {
+        player.pendingChestPick = false;
+        player.pendingTargetPick = false;
+        player.pendingChestOutcome = null;
+        player.availableTargets = [];
+        player.lockoutUntil = null;
+        player.status = "finished";
       }
-    };
+
+      const standings = buildGoldRushStandings(this.goldRushPlayers());
+      const winners = standings.slice(0, 3).map((standing) => standing.playerId);
+      const totalCorrectAnswers = standings.reduce((sum, standing) => sum + standing.correctAnswers, 0);
+      const totalWrongAnswers = standings.reduce((sum, standing) => sum + standing.wrongAnswers, 0);
+      const totalChaosTriggers = standings.reduce((sum, standing) => sum + standing.chaosTriggers, 0);
+      const totalGoldInPlay = standings.reduce((sum, standing) => sum + standing.gold, 0);
+
+      this.lastResult = {
+        matchId: createId("match"),
+        sessionId: this.sessionId,
+        code: this.code,
+        gameType: "goldrush",
+        startedAt: this.startedAt ?? this.createdAt,
+        endedAt: this.endedAt,
+        durationMs: (this.startedAt ? this.endedAt - this.startedAt : 0) || 0,
+        playerCount: standings.length,
+        winners,
+        standings,
+        stats: {
+          totalCorrectAnswers,
+          totalWrongAnswers,
+          totalChaosTriggers,
+          totalGoldInPlay,
+          winningGold: standings[0]?.gold ?? 0
+        }
+      };
+    } else {
+      for (const player of this.quizDashPlayers()) {
+        player.pendingChestPick = false;
+        player.pendingTargetPick = false;
+        player.pendingChestOutcome = null;
+        player.availableTargets = [];
+        player.status = "finished";
+      }
+
+      const standings = buildQuizDashStandings(this.quizDashPlayers());
+      const winners = standings.slice(0, 3).map((standing) => standing.playerId);
+      const totalCorrectAnswers = standings.reduce((sum, standing) => sum + standing.correctAnswers, 0);
+      const totalWrongAnswers = standings.reduce((sum, standing) => sum + standing.wrongAnswers, 0);
+
+      this.lastResult = {
+        matchId: createId("match"),
+        sessionId: this.sessionId,
+        code: this.code,
+        gameType: "quizdash",
+        startedAt: this.startedAt ?? this.createdAt,
+        endedAt: this.endedAt,
+        durationMs: (this.startedAt ? this.endedAt - this.startedAt : 0) || 0,
+        playerCount: standings.length,
+        winners,
+        standings,
+        stats: {
+          totalCorrectAnswers,
+          totalWrongAnswers,
+          winningDistance: standings[0]?.distance ?? 0
+        }
+      };
+    }
 
     await this.persistState(true);
     await this.schedulePhaseAlarm();
@@ -574,13 +942,7 @@ export class GameSessionDurableObject extends DurableObject<Env> {
       phase: "finished",
       remainingMs: 0
     });
-    this.broadcast({
-      v: PROTOCOL_VERSION,
-      type: "match_finished",
-      matchId: this.lastResult.matchId,
-      winners: this.lastResult.winners,
-      standings: this.lastResult.standings
-    });
+    this.broadcast(this.buildMatchFinishedEvent());
     this.broadcastPlayerStates();
 
     try {
@@ -616,24 +978,26 @@ export class GameSessionDurableObject extends DurableObject<Env> {
     const now = Date.now();
     let lockoutChanged = false;
 
-    for (const player of this.players.values()) {
-      if (player.lockoutUntil !== null && player.lockoutUntil <= now) {
-        clearExpiredLockout(player, now);
-        lockoutChanged = true;
+    if (isGoldRushConfig(this.config)) {
+      for (const player of this.goldRushPlayers()) {
+        if (player.lockoutUntil !== null && player.lockoutUntil <= now) {
+          clearExpiredLockout(player, now);
+          lockoutChanged = true;
+        }
       }
     }
 
     if (this.phase === "countdown" && this.countdownEndsAt && now >= this.countdownEndsAt) {
       this.phase = "live";
       this.startedAt = now;
-      this.liveEndsAt = now + this.config.raceDurationMs;
+      this.liveEndsAt = now + this.getDurationMs();
       await this.persistState(true);
       await this.schedulePhaseAlarm();
       this.broadcast({
         v: PROTOCOL_VERSION,
         type: "phase_changed",
         phase: "live",
-        remainingMs: this.config.raceDurationMs
+        remainingMs: this.getDurationMs()
       });
       this.broadcastPlayerStates();
     }
@@ -642,10 +1006,14 @@ export class GameSessionDurableObject extends DurableObject<Env> {
       if (this.liveEndsAt && now >= this.liveEndsAt) {
         await this.finishMatch();
       } else {
-        if (lockoutChanged) {
-          this.broadcastPlayerStates();
+        if (isQuizDashConfig(this.config)) {
+          this.broadcastSnapshot();
+        } else {
+          if (lockoutChanged) {
+            this.broadcastPlayerStates();
+          }
+          this.broadcastSnapshot();
         }
-        this.broadcastSnapshot();
       }
     } else if (this.phase === "countdown") {
       this.broadcast({
@@ -663,21 +1031,45 @@ export class GameSessionDurableObject extends DurableObject<Env> {
 
   private buildPlayerState(player: SessionPlayer): PlayerStateEvent {
     const now = Date.now();
-    clearExpiredLockout(player, now);
+
+    if (isGoldRushPlayer(player)) {
+      clearExpiredLockout(player, now);
+      return {
+        v: PROTOCOL_VERSION,
+        type: "player_state",
+        gameType: "goldrush",
+        phase: this.phase,
+        playerId: player.playerId,
+        gold: player.gold,
+        rank: player.rank,
+        correctAnswers: player.correctAnswers,
+        wrongAnswers: player.wrongAnswers,
+        chaosTriggers: player.chaosTriggerCount,
+        lockoutEndsAt: player.lockoutUntil && player.lockoutUntil > now ? player.lockoutUntil : null,
+        pendingChestPick: player.pendingChestPick,
+        pendingTargetPick: player.pendingTargetPick,
+        availableTargets: player.pendingTargetPick ? player.availableTargets : [],
+        currentQuestion:
+          this.phase === "live" && !player.pendingChestPick && !player.pendingTargetPick && !isLockoutActive(player, now)
+            ? getGoldRushQuestionForPlayer(player)
+            : null,
+        recentOutcome: player.recentOutcome
+      };
+    }
 
     return {
       v: PROTOCOL_VERSION,
       type: "player_state",
+      gameType: "quizdash",
       phase: this.phase,
       playerId: player.playerId,
-      distance: Math.round(player.distance * 100) / 100,
-      rank: player.rank,
-      correctAnswers: player.correctAnswers,
-      wrongAnswers: player.wrongAnswers,
-      effectsTriggered: player.effectCount,
-      lockoutEndsAt: player.lockoutUntil && player.lockoutUntil > now ? player.lockoutUntil : null,
-      pendingRewardChoice: player.pendingRewardChoice,
-      currentQuestion: this.phase === "live" && !player.pendingRewardChoice ? getQuestionForPlayer(player) : null,
+      pendingChestPick: player.pendingChestPick,
+      pendingTargetPick: player.pendingTargetPick,
+      availableTargets: player.pendingTargetPick ? player.availableTargets : [],
+      currentQuestion:
+        this.phase === "live" && !player.pendingChestPick && !player.pendingTargetPick
+          ? getQuizDashQuestionForPlayer(player)
+          : null,
       recentOutcome: player.recentOutcome
     };
   }
@@ -705,48 +1097,108 @@ export class GameSessionDurableObject extends DurableObject<Env> {
     }
 
     this.lastSnapshotSentAt = now;
-    const players = [...this.players.values()]
-      .sort((left, right) => left.rank - right.rank)
-      .map((player) => ({
-        id: player.playerId,
-        name: player.name,
-        avatarId: player.avatarId,
-        d: Math.round(player.distance * 100) / 100,
-        r: player.rank,
-        correctAnswers: player.correctAnswers,
-        wrongAnswers: player.wrongAnswers,
-        status: player.status
-      }));
+
+    if (isGoldRushConfig(this.config)) {
+      this.broadcast({
+        v: PROTOCOL_VERSION,
+        type: "snapshot",
+        gameType: "goldrush",
+        phase: this.phase,
+        tick: this.tick,
+        serverTimeMs: now,
+        remainingMs: this.getRemainingMs(now),
+        players: this.goldRushPlayers()
+          .sort((left, right) => left.rank - right.rank)
+          .map((player) => ({
+            gameType: "goldrush" as const,
+            id: player.playerId,
+            name: player.name,
+            avatarId: player.avatarId,
+            gold: player.gold,
+            rank: player.rank,
+            correctAnswers: player.correctAnswers,
+            wrongAnswers: player.wrongAnswers,
+            status: player.status
+          }))
+      });
+      return;
+    }
 
     this.broadcast({
       v: PROTOCOL_VERSION,
       type: "snapshot",
+      gameType: "quizdash",
       phase: this.phase,
       tick: this.tick,
       serverTimeMs: now,
-      remainingMs:
-        this.phase === "countdown"
-          ? Math.max(0, (this.countdownEndsAt ?? now) - now)
-          : this.phase === "live"
-            ? Math.max(0, (this.liveEndsAt ?? now) - now)
-            : 0,
-      players
+      remainingMs: this.getRemainingMs(now),
+      players: this.quizDashPlayers()
+        .sort((left, right) => left.rank - right.rank)
+        .map((player) => ({
+          gameType: "quizdash" as const,
+          id: player.playerId,
+          name: player.name,
+          avatarId: player.avatarId,
+          distance: Math.round(player.distance * 100) / 100,
+          rank: player.rank,
+          correctAnswers: player.correctAnswers,
+          wrongAnswers: player.wrongAnswers,
+          status: player.status
+        }))
     });
   }
 
-  private broadcastRoster(): void {
-    const players: RosterPlayer[] = [...this.players.values()]
-      .sort((left, right) => left.joinedAt - right.joinedAt)
-      .map((player) => ({
-        id: player.playerId,
-        name: player.name,
-        avatarId: player.avatarId,
-        connected: player.connected,
-        rank: player.rank,
-        distance: Math.round(player.distance * 100) / 100
-      }));
+  private getRemainingMs(now: number): number {
+    if (this.phase === "countdown") {
+      return Math.max(0, (this.countdownEndsAt ?? now) - now);
+    }
+    if (this.phase === "live") {
+      return Math.max(0, (this.liveEndsAt ?? now) - now);
+    }
+    return 0;
+  }
 
-    this.broadcast({ v: PROTOCOL_VERSION, type: "roster_update", players });
+  private broadcastRoster(): void {
+    const players: RosterPlayer[] = isGoldRushConfig(this.config)
+      ? this.goldRushPlayers()
+          .sort((left, right) => left.joinedAt - right.joinedAt)
+          .map((player) => ({
+            gameType: "goldrush" as const,
+            id: player.playerId,
+            name: player.name,
+            avatarId: player.avatarId,
+            connected: player.connected,
+            rank: player.rank,
+            gold: player.gold
+          }))
+      : this.quizDashPlayers()
+          .sort((left, right) => left.joinedAt - right.joinedAt)
+          .map((player) => ({
+            gameType: "quizdash" as const,
+            id: player.playerId,
+            name: player.name,
+            avatarId: player.avatarId,
+            connected: player.connected,
+            rank: player.rank,
+            distance: Math.round(player.distance * 100) / 100
+          }));
+
+    this.broadcast({ v: PROTOCOL_VERSION, type: "roster_update", gameType: this.config.gameType, players });
+  }
+
+  private buildMatchFinishedEvent(): ServerEvent {
+    if (!this.lastResult) {
+      return { v: PROTOCOL_VERSION, type: "error", code: "RESULT_MISSING", message: "Match result missing." };
+    }
+
+    return {
+      v: PROTOCOL_VERSION,
+      type: "match_finished",
+      gameType: this.lastResult.gameType,
+      matchId: this.lastResult.matchId,
+      winners: this.lastResult.winners,
+      standings: this.lastResult.standings
+    } as ServerEvent;
   }
 
   private broadcast(event: ServerEvent): void {
@@ -811,5 +1263,26 @@ export class GameSessionDurableObject extends DurableObject<Env> {
     };
 
     await this.ctx.storage.put(STORAGE_KEY, state);
+  }
+
+  private getDurationMs(): number {
+    return isGoldRushConfig(this.config) ? this.config.matchDurationMs : this.config.raceDurationMs;
+  }
+
+  private goldRushPlayers() {
+    return [...this.players.values()].filter(isGoldRushPlayer);
+  }
+
+  private quizDashPlayers() {
+    return [...this.players.values()].filter(isQuizDashPlayer);
+  }
+
+  private syncRanksForCurrentGame(): void {
+    if (isGoldRushConfig(this.config)) {
+      syncGoldRushRanks(this.goldRushPlayers());
+      return;
+    }
+
+    syncQuizDashRanks(this.quizDashPlayers());
   }
 }

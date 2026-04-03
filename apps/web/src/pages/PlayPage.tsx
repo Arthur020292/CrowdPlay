@@ -5,8 +5,7 @@ import {
   PROTOCOL_VERSION,
   coercePlayerAvatarId,
   getDefaultPlayerAvatar,
-  getPlayerAccentHex,
-  getPlayerAvatarPreset,
+  type GameType,
   type MatchFinishedEvent,
   type PlayerAvatarId,
   type PlayerStateEvent,
@@ -18,10 +17,27 @@ import { PlayerIdentityPanel } from "../components/PlayerIdentityPanel";
 import { useSessionSocket } from "../hooks/useSessionSocket";
 import { buildSessionSocketUrl, joinSession } from "../lib/api";
 import { getPlayerSession, savePlayerSession } from "../lib/storage";
-import { formatRemainingLabel } from "../lib/time";
 
 function formatLockoutLabel(remainingMs: number): string {
   return `${Math.max(1, Math.ceil(remainingMs / 1000))}s`;
+}
+
+function WaitingPanel({
+  eyebrow,
+  title,
+  detail
+}: {
+  eyebrow: string;
+  title: string;
+  detail: string;
+}) {
+  return (
+    <div className="mt-6 rounded-[1.75rem] border border-white/10 bg-white/[0.06] p-6 text-left">
+      <div className="text-xs font-black uppercase tracking-[0.3em] text-slate-400">{eyebrow}</div>
+      <h2 className="mt-3 text-2xl font-black text-white">{title}</h2>
+      <p className="mt-3 text-sm leading-6 text-slate-300">{detail}</p>
+    </div>
+  );
 }
 
 export function PlayPage() {
@@ -35,8 +51,8 @@ export function PlayPage() {
   const [identityStep, setIdentityStep] = useState<"name" | "avatar">(storedName.trim() ? "avatar" : "name");
   const [playerId, setPlayerId] = useState(stored?.playerId ?? "");
   const [playerToken, setPlayerToken] = useState(stored?.playerToken ?? "");
+  const [gameType, setGameType] = useState<GameType | null>(null);
   const [phase, setPhase] = useState("lobby");
-  const [remainingMs, setRemainingMs] = useState(0);
   const [snapshot, setSnapshot] = useState<SnapshotEvent | null>(null);
   const [playerState, setPlayerState] = useState<PlayerStateEvent | null>(null);
   const [result, setResult] = useState<MatchFinishedEvent | null>(null);
@@ -52,6 +68,7 @@ export function PlayPage() {
     onEvent(event) {
       switch (event.type) {
         case "join_ack":
+          setGameType(event.summary.config.gameType);
           setPhase(event.phase);
           if (event.playerId) {
             setPlayerId(event.playerId);
@@ -60,22 +77,22 @@ export function PlayPage() {
           break;
         case "phase_changed":
           setPhase(event.phase);
-          setRemainingMs(event.remainingMs ?? event.countdownMs ?? 0);
           setActionPending(false);
           break;
         case "snapshot":
+          setGameType(event.gameType);
           setSnapshot(event);
           setPhase(event.phase);
-          setRemainingMs(event.remainingMs);
           break;
         case "player_state":
+          setGameType(event.gameType);
           setPlayerState(event);
           setActionPending(false);
           break;
         case "match_finished":
+          setGameType(event.gameType);
           setResult(event);
           setPhase("finished");
-          setRemainingMs(0);
           setActionPending(false);
           break;
         case "error":
@@ -88,21 +105,18 @@ export function PlayPage() {
     }
   });
 
+  const goldRushPlayerState = playerState?.gameType === "goldrush" ? playerState : null;
+  const quizDashPlayerState = playerState?.gameType === "quizdash" ? playerState : null;
+  const supportsChestFlow = goldRushPlayerState ?? quizDashPlayerState;
+
   useEffect(() => {
-    if (!playerState?.lockoutEndsAt) {
+    if (!goldRushPlayerState?.lockoutEndsAt) {
       return;
     }
 
     const interval = window.setInterval(() => setNowMs(Date.now()), 250);
     return () => window.clearInterval(interval);
-  }, [playerState?.lockoutEndsAt]);
-
-  const me = snapshot?.players.find((player) => player.id === playerId);
-  const leaderDistance = snapshot?.players[0]?.d ?? 1;
-  const myDistance = playerState?.distance ?? me?.d ?? 0;
-  const progress = Math.min((myDistance / Math.max(leaderDistance, 1)) * 100, 100);
-  const lockoutRemainingMs =
-    playerState?.lockoutEndsAt && playerState.lockoutEndsAt > nowMs ? playerState.lockoutEndsAt - nowMs : 0;
+  }, [goldRushPlayerState?.lockoutEndsAt]);
 
   const handleJoin = async (event: FormEvent) => {
     event.preventDefault();
@@ -113,6 +127,7 @@ export function PlayPage() {
       const joined = await joinSession(code, name, avatarId);
       setPlayerId(joined.playerId);
       setPlayerToken(joined.playerToken);
+      setGameType(joined.summary.config.gameType);
       savePlayerSession({
         code,
         avatarId,
@@ -142,7 +157,7 @@ export function PlayPage() {
     });
   };
 
-  const handleRewardChoice = (choice: "move" | "effect") => {
+  const handleChestPick = (chestIndex: 0 | 1 | 2) => {
     if (actionPending) {
       return;
     }
@@ -151,192 +166,190 @@ export function PlayPage() {
     setError(null);
     send({
       v: PROTOCOL_VERSION,
-      type: "reward_choice",
-      choice
+      type: "chest_pick",
+      chestIndex
+    });
+  };
+
+  const handleTargetPick = (targetPlayerId: string) => {
+    if (actionPending) {
+      return;
+    }
+
+    setActionPending(true);
+    setError(null);
+    send({
+      v: PROTOCOL_VERSION,
+      type: "target_pick",
+      targetPlayerId
     });
   };
 
   if (!playerToken) {
     return (
-      <div className="space-y-4 py-4 sm:py-10">
-        <PlayerIdentityPanel
-          code={code}
-          name={name}
-          avatarId={avatarId}
-          step={identityStep}
-          onNameChange={setName}
-          onAvatarChange={setAvatarId}
-          onContinue={() => {
-            if (!name.trim()) {
-              return;
-            }
-            setError(null);
-            setIdentityStep("avatar");
-          }}
-          onBack={() => {
-            setError(null);
-            setIdentityStep("name");
-          }}
-          onSubmit={handleJoin}
-          ctaLabel="Enter game"
-          error={error}
-          submitting={submitting}
-        />
-        <div className="text-center text-sm font-medium text-slate-300">
-          Wrong room?{" "}
-          <Link className="font-semibold text-cyan-200 underline decoration-cyan-400/50 underline-offset-4" to="/join">
-            Enter a different code
-          </Link>
+      <div className="cp-page-background cp-page-background--ambient min-h-screen">
+        <div className="space-y-4 py-4 sm:py-10">
+          <PlayerIdentityPanel
+            code={code}
+            name={name}
+            avatarId={avatarId}
+            step={identityStep}
+            onNameChange={setName}
+            onAvatarChange={setAvatarId}
+            onContinue={() => {
+              if (!name.trim()) {
+                return;
+              }
+              setError(null);
+              setIdentityStep("avatar");
+            }}
+            onBack={() => {
+              setError(null);
+              setIdentityStep("name");
+            }}
+            onSubmit={handleJoin}
+            ctaLabel="Enter game"
+            error={error}
+            submitting={submitting}
+          />
+          <div className="text-center text-sm font-medium text-slate-300">
+            Wrong room?{" "}
+            <Link className="font-semibold text-cyan-200 underline decoration-cyan-400/50 underline-offset-4" to="/join">
+              Enter a different code
+            </Link>
+          </div>
         </div>
       </div>
     );
   }
 
+  const currentGameType = result?.gameType ?? playerState?.gameType ?? snapshot?.gameType ?? gameType;
+  const me = snapshot?.players.find((player) => player.id === playerId);
+  const activeAvatarId = me?.avatarId ?? avatarId;
+  const backgroundClass = phase === "lobby" || phase === "countdown"
+    ? "cp-page-background cp-page-background--ambient"
+    : "cp-page-background cp-page-background--static";
+  const lockoutRemainingMs =
+    goldRushPlayerState?.lockoutEndsAt && goldRushPlayerState.lockoutEndsAt > nowMs ? goldRushPlayerState.lockoutEndsAt - nowMs : 0;
+  const recentOutcome = goldRushPlayerState?.recentOutcome ?? quizDashPlayerState?.recentOutcome ?? null;
+  const currentQuestion = goldRushPlayerState?.currentQuestion ?? quizDashPlayerState?.currentQuestion ?? null;
+
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-6">
+    <div className={`${backgroundClass} min-h-screen`}>
+      <div className="mx-auto flex max-w-2xl flex-col gap-6">
       <section className="cp-card-dark p-6 text-center">
-        <h1 className="text-4xl font-black text-white">{name || "Player"}</h1>
-        <div className="mt-4 inline-flex items-center gap-3 rounded-full border border-white/10 bg-white/[0.08] px-3 py-2 text-sm text-slate-200">
-          <AvatarBadge avatarId={me?.avatarId ?? avatarId} size={40} />
-          {getPlayerAvatarPreset(me?.avatarId ?? avatarId).label}
-        </div>
+          <div className="flex items-center justify-center gap-4">
+            <AvatarBadge avatarId={activeAvatarId} size={40} />
+            <h1 className="text-4xl font-black text-white">{name || "Player"}</h1>
+          </div>
 
-        <div className="mt-6 rounded-[1.5rem] border border-white/10 bg-white/[0.07] p-4">
-          <div className="grid gap-3 sm:grid-cols-4">
-            <div className="rounded-[1.25rem] bg-slate-950/50 px-4 py-3">
-              <div className="text-xs uppercase tracking-[0.25em] text-slate-400">Rank</div>
-              <div className="mt-2 text-2xl font-black text-white">{playerState?.rank ?? me?.r ?? "-"}</div>
+          {recentOutcome ? (
+            <div className="mt-6 rounded-[1.5rem] border border-cyan-300/20 bg-cyan-400/10 px-5 py-4 text-left">
+              <div className="text-xs font-black uppercase tracking-[0.3em] text-cyan-200">{recentOutcome.title}</div>
+              <div className="mt-2 text-sm text-slate-200">{recentOutcome.detail}</div>
             </div>
-            <div className="rounded-[1.25rem] bg-slate-950/50 px-4 py-3">
-              <div className="text-xs uppercase tracking-[0.25em] text-slate-400">Distance</div>
-              <div className="mt-2 text-2xl font-black" style={{ color: getPlayerAccentHex(me?.avatarId ?? avatarId) }}>
-                {myDistance.toFixed(1)}m
+          ) : null}
+
+          {phase === "lobby" || phase === "countdown" ? (
+            <WaitingPanel
+              eyebrow={phase === "countdown" ? "Get ready" : "Waiting room"}
+              title={phase === "countdown" ? "Your first question unlocks when the countdown ends." : "The host is waiting to start the match."}
+              detail="Stay on this screen. The game will push your next prompt automatically."
+            />
+          ) : phase === "finished" ? (
+            <WaitingPanel
+              eyebrow="Match complete"
+              title={currentGameType === "goldrush" ? "The vault race is over." : "The race is finished."}
+              detail="The host screen has the live podium and final standings."
+            />
+          ) : supportsChestFlow?.pendingTargetPick ? (
+            <div className="mt-6 rounded-[1.75rem] border border-white/10 bg-white/[0.06] p-6 text-left">
+              <div className="text-xs font-black uppercase tracking-[0.3em] text-amber-200">Pick a target</div>
+              <h2 className="mt-3 text-2xl font-black text-white">
+                {currentGameType === "goldrush" ? "Choose one of the top vaults." : "Choose one of the top racers."}
+              </h2>
+              <p className="mt-3 text-sm leading-6 text-slate-300">{supportsChestFlow.recentOutcome?.detail ?? "Select who takes the hit."}</p>
+              <div className="mt-6 grid gap-3">
+                {supportsChestFlow.availableTargets.map((target) => (
+                  <button
+                    key={target.playerId}
+                    type="button"
+                    onClick={() => handleTargetPick(target.playerId)}
+                    disabled={actionPending}
+                    className="flex items-center justify-between rounded-[1.4rem] border border-white/12 bg-white/[0.08] px-5 py-4 text-left transition hover:border-amber-300/40 hover:bg-amber-400/10 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <span className="flex items-center gap-3">
+                      <AvatarBadge avatarId={target.avatarId} size={34} />
+                      <span>
+                        <span className="block text-base font-semibold text-white">{target.name}</span>
+                        <span className="block text-xs uppercase tracking-[0.2em] text-slate-400">Choose target</span>
+                      </span>
+                    </span>
+                    <span className="text-sm font-semibold text-amber-200">Pick</span>
+                  </button>
+                ))}
               </div>
             </div>
-            <div className="rounded-[1.25rem] bg-slate-950/50 px-4 py-3">
-              <div className="text-xs uppercase tracking-[0.25em] text-slate-400">Correct</div>
-              <div className="mt-2 text-2xl font-black text-white">{playerState?.correctAnswers ?? me?.correctAnswers ?? 0}</div>
-            </div>
-            <div className="rounded-[1.25rem] bg-slate-950/50 px-4 py-3">
-              <div className="text-xs uppercase tracking-[0.25em] text-slate-400">Remaining</div>
-              <div className="mt-2 text-2xl font-black text-white">{formatRemainingLabel(phase, remainingMs)}</div>
-            </div>
-          </div>
-          <div className="mt-4 h-3 overflow-hidden rounded-full bg-white/10">
-            <div className="h-full rounded-full transition-all" style={{ width: `${progress}%`, backgroundColor: getPlayerAccentHex(me?.avatarId ?? avatarId) }} />
-          </div>
-        </div>
-
-        {playerState?.recentOutcome ? (
-          <div className="mt-6 rounded-[1.5rem] border border-cyan-300/20 bg-cyan-400/10 px-5 py-4 text-left">
-            <div className="text-xs font-black uppercase tracking-[0.3em] text-cyan-200">{playerState.recentOutcome.title}</div>
-            <div className="mt-2 text-sm text-slate-200">{playerState.recentOutcome.detail}</div>
-          </div>
-        ) : null}
-
-        {phase === "lobby" || phase === "countdown" ? (
-          <div className="mt-6 rounded-[1.75rem] border border-white/10 bg-white/[0.06] p-6 text-left">
-            <div className="text-xs font-black uppercase tracking-[0.3em] text-slate-400">
-              {phase === "countdown" ? "Get ready" : "Waiting room"}
-            </div>
-            <h2 className="mt-3 text-2xl font-black text-white">
-              {phase === "countdown" ? "Questions unlock when the countdown ends." : "The host is waiting to start the match."}
-            </h2>
-            <p className="mt-3 text-sm leading-6 text-slate-300">
-              Stay on this screen. Once the match goes live, your first question will appear automatically.
-            </p>
-          </div>
-        ) : phase === "finished" ? (
-          <div className="mt-6 rounded-[1.75rem] border border-amber-300/20 bg-[linear-gradient(180deg,rgba(120,53,15,0.28),rgba(8,18,37,0.84))] p-6 text-left">
-            <div className="text-xs font-black uppercase tracking-[0.3em] text-amber-200/80">Match complete</div>
-            <h2 className="mt-3 text-2xl font-black text-white">The race is over.</h2>
-            <p className="mt-3 text-sm leading-6 text-slate-300">Check the host screen for the podium or scroll down here for the final standings.</p>
-          </div>
-        ) : playerState?.pendingRewardChoice ? (
-          <div className="mt-6 rounded-[1.75rem] border border-white/10 bg-white/[0.06] p-6 text-left">
-            <div className="text-xs font-black uppercase tracking-[0.3em] text-sky-200">Choose your reward</div>
-            <h2 className="mt-3 text-2xl font-black text-white">Play it safe or open chaos.</h2>
-            <p className="mt-3 text-sm leading-6 text-slate-300">
-              A safe move guarantees forward progress. The random effect can launch you ahead or cause trouble for you or somebody else.
-            </p>
-            <div className="mt-6 grid gap-4 md:grid-cols-2">
-              <button
-                type="button"
-                onClick={() => handleRewardChoice("move")}
-                disabled={actionPending}
-                className="cp-button-primary min-h-[4.5rem] text-base font-black disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                Move forward
-              </button>
-              <button
-                type="button"
-                onClick={() => handleRewardChoice("effect")}
-                disabled={actionPending}
-                className="cp-button-secondary min-h-[4.5rem] text-base font-black disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                Random effect
-              </button>
-            </div>
-          </div>
-        ) : lockoutRemainingMs > 0 ? (
-          <div className="mt-6 rounded-[1.75rem] border border-rose-300/20 bg-rose-400/10 p-6 text-left">
-            <div className="text-xs font-black uppercase tracking-[0.3em] text-rose-200">Locked out</div>
-            <h2 className="mt-3 text-2xl font-black text-white">Next question unlocks in {formatLockoutLabel(lockoutRemainingMs)}.</h2>
-            <p className="mt-3 text-sm leading-6 text-slate-300">
-              Wrong answers cause a short freeze. Stay ready, because your next question will appear as soon as the timer ends.
-            </p>
-          </div>
-        ) : playerState?.currentQuestion ? (
-          <div className="mt-6 rounded-[1.75rem] border border-white/10 bg-white/[0.06] p-6 text-left">
-            <div className="text-xs font-black uppercase tracking-[0.3em] text-cyan-200">
-              {playerState.currentQuestion.format === "boolean" ? "True or false" : "Multiple choice"}
-            </div>
-            <h2 className="mt-3 text-2xl font-black text-white">{playerState.currentQuestion.prompt}</h2>
-            <div className="mt-6 grid gap-3">
-              {playerState.currentQuestion.options.map((option) => (
-                <button
-                  key={option.id}
-                  type="button"
-                  onClick={() => handleAnswer(playerState.currentQuestion!.id, option.id)}
-                  disabled={actionPending}
-                  className="rounded-[1.4rem] border border-white/12 bg-white/[0.08] px-5 py-4 text-left text-base font-semibold text-white transition hover:border-cyan-300/40 hover:bg-cyan-400/10 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div className="mt-6 rounded-[1.75rem] border border-white/10 bg-white/[0.06] p-6 text-left">
-            <div className="text-xs font-black uppercase tracking-[0.3em] text-slate-400">Stand by</div>
-            <h2 className="mt-3 text-2xl font-black text-white">Waiting for your next question.</h2>
-            <p className="mt-3 text-sm leading-6 text-slate-300">
-              Your progress is synced. The next prompt will appear automatically when your player state updates.
-            </p>
-          </div>
-        )}
-
-        {error ? <p className="mt-4 text-sm text-rose-300">{error}</p> : null}
-      </section>
-
-      {result ? (
-        <section className="cp-card-dark border-amber-300/20 bg-[linear-gradient(180deg,rgba(120,53,15,0.28),rgba(8,18,37,0.84))] p-6">
-          <p className="text-sm uppercase tracking-[0.35em] text-amber-200/80">Final standings</p>
-          <h2 className="mt-2 text-2xl font-black text-white">Top finishers</h2>
-          <div className="mt-4 space-y-2">
-            {result.standings.slice(0, 5).map((standing) => (
-              <div key={standing.playerId} className="flex items-center justify-between rounded-2xl bg-slate-950/50 px-4 py-3">
-                <span className="font-semibold text-white">
-                  {standing.rank}. {standing.name}
-                </span>
-                <span className="text-sm text-cyan-200">
-                  {standing.distance.toFixed(1)}m • {standing.correctAnswers} correct
-                </span>
+          ) : supportsChestFlow?.pendingChestPick ? (
+            <div className="mt-6 rounded-[1.75rem] border border-white/10 bg-white/[0.06] p-6 text-left">
+              <div className="text-xs font-black uppercase tracking-[0.3em] text-sky-200">Pick a chest</div>
+              <h2 className="mt-3 text-2xl font-black text-white">Choose 1 of 3 hidden chests.</h2>
+              <p className="mt-3 text-sm leading-6 text-slate-300">
+                {currentGameType === "goldrush"
+                  ? "Every chest can help you cash in or throw the leaderboard into chaos."
+                  : "Every chest can boost your run or scramble the race order."}
+              </p>
+              <div className="mt-6 grid gap-4 md:grid-cols-3">
+                {[0, 1, 2].map((chestIndex) => (
+                  <button
+                    key={chestIndex}
+                    type="button"
+                    onClick={() => handleChestPick(chestIndex as 0 | 1 | 2)}
+                    disabled={actionPending}
+                    className="rounded-[1.8rem] border border-amber-200/60 bg-[linear-gradient(180deg,rgba(254,243,199,0.96),rgba(253,230,138,0.82))] px-5 py-7 text-center text-lg font-black text-amber-950 shadow-[0_18px_30px_rgba(245,158,11,0.18)] transition hover:-translate-y-1 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    Chest {chestIndex + 1}
+                  </button>
+                ))}
               </div>
-            ))}
-          </div>
+            </div>
+          ) : lockoutRemainingMs > 0 ? (
+            <WaitingPanel
+              eyebrow="Locked out"
+              title={`Next question unlocks in ${formatLockoutLabel(lockoutRemainingMs)}.`}
+              detail="Wrong answers freeze your controller for a few seconds."
+            />
+          ) : currentQuestion ? (
+            <div className="mt-6 rounded-[1.75rem] border border-white/10 bg-white/[0.06] p-6 text-left">
+              <div className="text-xs font-black uppercase tracking-[0.3em] text-cyan-200">
+                {currentQuestion.format === "boolean" ? "True or false" : "Multiple choice"}
+              </div>
+              <h2 className="mt-3 text-2xl font-black text-white">{currentQuestion.prompt}</h2>
+              <div className="mt-6 grid gap-3">
+                {currentQuestion.options.map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => handleAnswer(currentQuestion.id, option.id)}
+                    disabled={actionPending}
+                    className="rounded-[1.4rem] border border-white/12 bg-white/[0.08] px-5 py-4 text-left text-base font-semibold text-white transition hover:border-cyan-300/40 hover:bg-cyan-400/10 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <WaitingPanel
+              eyebrow="Stand by"
+              title="Waiting for your next question."
+              detail="Your controller is synced. The next prompt will appear automatically."
+            />
+          )}
+
+          {error ? <p className="mt-4 text-sm text-rose-300">{error}</p> : null}
         </section>
-      ) : null}
+      </div>
     </div>
   );
 }

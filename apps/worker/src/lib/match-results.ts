@@ -45,6 +45,30 @@ export async function readMatchResult(database: D1Database, matchId: string): Pr
     return null;
   }
 
+  const gameType = String(row.game_type) as MatchResult["gameType"];
+  const standings = (JSON.parse(String(row.standings_json)) as Array<Record<string, unknown>>).map((standing, index) => ({
+    ...standing,
+    avatarId: coercePlayerAvatarId(standing.avatarId ?? standing.color, index)
+  }));
+  const winners = JSON.parse(String(row.winner_ids_json)) as string[];
+  const stats = JSON.parse(String(row.stats_json)) as MatchResult["stats"];
+
+  if (gameType === "goldrush") {
+    return {
+      matchId: String(row.match_id),
+      sessionId: String(row.session_id),
+      code: String(row.code),
+      gameType: "goldrush",
+      startedAt: Number(row.started_at),
+      endedAt: Number(row.ended_at),
+      durationMs: Number(row.duration_ms),
+      playerCount: Number(row.player_count),
+      winners,
+      standings: standings as MatchResult["standings"] & Extract<MatchResult, { gameType: "goldrush" }>["standings"],
+      stats: stats as Extract<MatchResult, { gameType: "goldrush" }>["stats"]
+    };
+  }
+
   return {
     matchId: String(row.match_id),
     sessionId: String(row.session_id),
@@ -54,11 +78,8 @@ export async function readMatchResult(database: D1Database, matchId: string): Pr
     endedAt: Number(row.ended_at),
     durationMs: Number(row.duration_ms),
     playerCount: Number(row.player_count),
-    winners: JSON.parse(String(row.winner_ids_json)) as string[],
-    standings: (JSON.parse(String(row.standings_json)) as Array<Record<string, unknown>>).map((standing, index) => ({
-      ...standing,
-      avatarId: coercePlayerAvatarId(standing.avatarId ?? standing.color, index)
-    })) as MatchResult["standings"],
-    stats: JSON.parse(String(row.stats_json))
+    winners,
+    standings: standings as MatchResult["standings"] & Extract<MatchResult, { gameType: "quizdash" }>["standings"],
+    stats: stats as Extract<MatchResult, { gameType: "quizdash" }>["stats"]
   };
 }
