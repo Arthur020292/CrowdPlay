@@ -1,16 +1,28 @@
-import { useEffect, useMemo, useRef } from "react";
-
-import { getPlayerAccentHex } from "@crowdplay/protocol";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { SnapshotEvent } from "@crowdplay/protocol";
+
+import { AvatarBadge } from "./AvatarBadge";
 
 interface RaceCanvasProps {
   snapshot: SnapshotEvent | null;
   previousSnapshot: SnapshotEvent | null;
+  className?: string;
+  lanePlayerIds?: string[];
 }
 
-export function RaceCanvas({ snapshot, previousSnapshot }: RaceCanvasProps) {
+interface AvatarPosition {
+  id: string;
+  avatarId: SnapshotEvent["players"][number]["avatarId"];
+  x: number;
+  y: number;
+  size: number;
+}
+
+export function RaceCanvas({ snapshot, previousSnapshot, className = "h-[360px]", lanePlayerIds }: RaceCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [avatarPositions, setAvatarPositions] = useState<AvatarPosition[]>([]);
+  const [laneOrder, setLaneOrder] = useState<string[]>([]);
 
   const maxDistance = useMemo(() => {
     const current = snapshot?.players.reduce((best, player) => Math.max(best, player.d), 0) ?? 0;
@@ -18,8 +30,50 @@ export function RaceCanvas({ snapshot, previousSnapshot }: RaceCanvasProps) {
   }, [snapshot]);
 
   useEffect(() => {
+    if (!snapshot) {
+      setLaneOrder([]);
+      return;
+    }
+
+    setLaneOrder((previousOrder) => {
+      const snapshotIds = new Set(snapshot.players.map((player) => player.id));
+      const nextOrder = previousOrder.filter((id) => snapshotIds.has(id));
+
+      snapshot.players.forEach((player) => {
+        if (!nextOrder.includes(player.id)) {
+          nextOrder.push(player.id);
+        }
+      });
+
+      if (nextOrder.length === previousOrder.length && nextOrder.every((id, index) => id === previousOrder[index])) {
+        return previousOrder;
+      }
+
+      return nextOrder;
+    });
+  }, [snapshot]);
+
+  const orderedPlayers = useMemo(() => {
+    if (!snapshot) {
+      return [];
+    }
+
+    const playerById = new Map(snapshot.players.map((player) => [player.id, player]));
+    const preferredOrder = lanePlayerIds?.length ? lanePlayerIds : laneOrder;
+    const ordered = preferredOrder.map((id) => playerById.get(id)).filter((player): player is SnapshotEvent["players"][number] => Boolean(player));
+
+    if (ordered.length === snapshot.players.length) {
+      return ordered;
+    }
+
+    const orderedIds = new Set(ordered.map((player) => player.id));
+    return [...ordered, ...snapshot.players.filter((player) => !orderedIds.has(player.id))];
+  }, [laneOrder, lanePlayerIds, snapshot]);
+
+  useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !snapshot) {
+      setAvatarPositions([]);
       return;
     }
 
@@ -43,7 +97,19 @@ export function RaceCanvas({ snapshot, previousSnapshot }: RaceCanvasProps) {
     const render = () => {
       const widthPx = canvas.width;
       const heightPx = canvas.height;
-      const laneHeight = heightPx / Math.max(snapshot.players.length, 1);
+      const playerCount = Math.max(orderedPlayers.length, 1);
+      const preferredLaneHeightPx = 56 * devicePixelRatio;
+      const safePaddingPx = 26 * devicePixelRatio;
+      const availableHeightPx = Math.max(heightPx - safePaddingPx * 2, preferredLaneHeightPx);
+      const laneHeight = Math.min(availableHeightPx / playerCount, preferredLaneHeightPx);
+      const trackHeightPx = laneHeight * playerCount;
+      const trackOffsetY = Math.max((heightPx - trackHeightPx) / 2, safePaddingPx);
+      const laneHeightCss = laneHeight / devicePixelRatio;
+      const trackOffsetYCss = trackOffsetY / devicePixelRatio;
+      const avatarSizePx = Math.max(Math.min(laneHeight * 0.78, 40 * devicePixelRatio), 12 * devicePixelRatio);
+      const avatarSizeCss = avatarSizePx / devicePixelRatio;
+      const labelFontSizePx = Math.max(Math.min(laneHeight * 0.42, 14 * devicePixelRatio), 8 * devicePixelRatio);
+      const distanceOffsetPx = Math.max(avatarSizePx / 2 + 10 * devicePixelRatio, 22 * devicePixelRatio);
       const alpha = Math.min((Date.now() - snapshot.serverTimeMs) / 120, 1.2);
 
       context.clearRect(0, 0, widthPx, heightPx);
@@ -61,37 +127,69 @@ export function RaceCanvas({ snapshot, previousSnapshot }: RaceCanvasProps) {
       }
       context.setLineDash([]);
 
-      snapshot.players.forEach((player, index) => {
+      context.strokeStyle = "rgba(255,255,255,0.1)";
+      context.lineWidth = 2 * devicePixelRatio;
+      for (let index = 0; index <= playerCount; index += 1) {
+        const y = trackOffsetY + laneHeight * index;
+        context.beginPath();
+        context.moveTo(0, y);
+        context.lineTo(widthPx, y);
+        context.stroke();
+      }
+
+      const nextAvatarPositions: AvatarPosition[] = [];
+
+      orderedPlayers.forEach((player, index) => {
         const previous = previousPlayers.get(player.id);
         const blendedDistance = previous ? previous.d + (player.d - previous.d) * alpha : player.d;
-        const y = laneHeight * index + laneHeight / 2;
+        const laneTop = trackOffsetY + laneHeight * index;
+        const y = laneTop + laneHeight / 2;
         const x = 24 * devicePixelRatio + (blendedDistance / maxDistance) * (widthPx - 80 * devicePixelRatio);
-        const color = getPlayerAccentHex(player.avatarId);
+        const xCss = 24 + (blendedDistance / maxDistance) * (canvas.clientWidth - 80);
+        const yCss = trackOffsetYCss + laneHeightCss * index + laneHeightCss / 2;
 
-        context.strokeStyle = "rgba(255,255,255,0.1)";
-        context.lineWidth = 2 * devicePixelRatio;
-        context.beginPath();
-        context.moveTo(0, laneHeight * index + laneHeight);
-        context.lineTo(widthPx, laneHeight * index + laneHeight);
-        context.stroke();
-
-        context.fillStyle = color;
-        context.beginPath();
-        context.arc(x, y, 16 * devicePixelRatio, 0, Math.PI * 2);
-        context.fill();
+        nextAvatarPositions.push({
+          id: player.id,
+          avatarId: player.avatarId,
+          x: xCss,
+          y: yCss,
+          size: avatarSizeCss
+        });
 
         context.fillStyle = "#e2e8f0";
-        context.font = `${Math.round(14 * devicePixelRatio)}px sans-serif`;
-        context.fillText(`${player.r}. ${player.name}`, 18 * devicePixelRatio, y - 20 * devicePixelRatio);
-        context.fillText(`${player.d.toFixed(1)}m`, x + 22 * devicePixelRatio, y + 5 * devicePixelRatio);
+        context.font = `${Math.round(labelFontSizePx)}px sans-serif`;
+        context.textBaseline = "middle";
+        context.fillText(`${player.r}. ${player.name}`, 18 * devicePixelRatio, y);
+        context.fillText(`${player.d.toFixed(1)}m`, x + distanceOffsetPx, y);
       });
+
+      setAvatarPositions(nextAvatarPositions);
 
       animationFrame = window.requestAnimationFrame(render);
     };
 
     render();
     return () => window.cancelAnimationFrame(animationFrame);
-  }, [maxDistance, previousSnapshot, snapshot]);
+  }, [maxDistance, orderedPlayers, previousSnapshot, snapshot]);
 
-  return <canvas ref={canvasRef} className="h-[360px] w-full rounded-[2rem] border border-white/10 bg-slate-950/80 shadow-2xl shadow-cyan-500/10" />;
+  return (
+    <div className={`relative w-full ${className}`.trim()}>
+      <canvas ref={canvasRef} className="h-full w-full border border-white/10 bg-slate-950/80 shadow-2xl shadow-cyan-500/10" />
+      <div className="pointer-events-none absolute inset-0">
+        {avatarPositions.map((player) => (
+          <div
+            key={player.id}
+            className="absolute"
+            style={{
+              left: `${player.x}px`,
+              top: `${player.y}px`,
+              transform: "translate(-50%, -50%)"
+            }}
+          >
+            <AvatarBadge avatarId={player.avatarId} size={player.size} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }

@@ -1,4 +1,5 @@
 import {
+  PLAYER_AVATAR_PRESETS,
   type MatchFinishedEvent,
   type MatchResult,
   type MatchStanding,
@@ -25,6 +26,52 @@ const playerSeeds: PlayerSeed[] = [
   { id: "p_zoe", name: "Zoe", avatarId: "owl" },
   { id: "p_leo", name: "Leo", avatarId: "shark" }
 ];
+
+const crowdedPlayerNames = [
+  "Ava",
+  "Liam",
+  "Mia",
+  "Noah",
+  "Zoe",
+  "Leo",
+  "Emma",
+  "Mason",
+  "Chloe",
+  "Lucas",
+  "Nora",
+  "Ethan",
+  "Ivy",
+  "Logan",
+  "Ruby",
+  "Owen",
+  "Ella",
+  "Aiden",
+  "Luna",
+  "Elijah",
+  "Maya",
+  "James",
+  "Aria",
+  "Benjamin",
+  "Sage",
+  "Henry",
+  "Skye",
+  "Jack",
+  "Hazel",
+  "Alexander",
+  "Nova",
+  "Daniel"
+] as const;
+
+const crowdedPlayerSeeds: PlayerSeed[] = crowdedPlayerNames.map((name, index) => ({
+  id: `crowded_${index + 1}`,
+  name,
+  avatarId: PLAYER_AVATAR_PRESETS[index % PLAYER_AVATAR_PRESETS.length].id
+}));
+
+const crowdedStandingsOrder = [
+  5, 1, 9, 0, 12, 3, 14, 7, 2, 10, 18, 4, 20, 8, 22, 6,
+  16, 11, 24, 13, 26, 15, 28, 17, 30, 19, 21, 23, 25, 27, 29, 31
+] as const;
 
 function makeRosterPlayer(seed: PlayerSeed, index: number, overrides: Partial<RosterPlayer> = {}): RosterPlayer {
   return {
@@ -70,6 +117,12 @@ export const previewRoster: RosterPlayer[] = [
   makeRosterPlayer(playerSeeds[4], 4, { connected: false }),
   makeRosterPlayer(playerSeeds[5], 5)
 ];
+
+export const previewCrowdedRoster: RosterPlayer[] = crowdedPlayerSeeds.map((seed, index) =>
+  makeRosterPlayer(seed, index, {
+    connected: index % 9 !== 0
+  })
+);
 
 export const previewCountdownSnapshot: SnapshotEvent = {
   v: PROTOCOL_VERSION,
@@ -120,6 +173,40 @@ export const previewLiveSnapshot: SnapshotEvent = {
   ]
 };
 
+export const previewLiveCrowdedPreviousSnapshot: SnapshotEvent = {
+  v: PROTOCOL_VERSION,
+  type: "snapshot",
+  phase: "live",
+  tick: 118,
+  serverTimeMs: FIXTURE_TIME - 80,
+  remainingMs: 48_000,
+  players: crowdedStandingsOrder.map((seedIndex, index) =>
+    makeSnapshotPlayer(
+      crowdedPlayerSeeds[seedIndex],
+      index,
+      Math.max(18, 126 - index * 2.35 + (index % 4) * 0.4),
+      Math.max(24, 182 - index * 3 + (index % 5)),
+      index % 9 === 0 ? { status: "disconnected" } : {}
+    )
+  )
+};
+
+export const previewLiveCrowdedSnapshot: SnapshotEvent = {
+  ...previewLiveCrowdedPreviousSnapshot,
+  tick: 119,
+  serverTimeMs: FIXTURE_TIME,
+  remainingMs: 47_920,
+  players: crowdedStandingsOrder.map((seedIndex, index) =>
+    makeSnapshotPlayer(
+      crowdedPlayerSeeds[seedIndex],
+      index,
+      Math.max(20, 128 - index * 2.3 + (index % 4) * 0.45),
+      Math.max(26, 185 - index * 3 + (index % 5)),
+      index % 9 === 0 ? { status: "disconnected" } : {}
+    )
+  )
+};
+
 export const previewSprintSnapshot: SnapshotEvent = {
   v: PROTOCOL_VERSION,
   type: "snapshot",
@@ -143,6 +230,14 @@ export const previewFinishedEvent: MatchFinishedEvent = {
   matchId: "match_preview_001",
   winners: [playerSeeds[0].id, playerSeeds[1].id, playerSeeds[2].id],
   standings: toStandings(previewSprintSnapshot.players)
+};
+
+export const previewCrowdedFinishedEvent: MatchFinishedEvent = {
+  v: PROTOCOL_VERSION,
+  type: "match_finished",
+  matchId: "match_preview_crowded_001",
+  winners: previewLiveCrowdedSnapshot.players.slice(0, 3).map((player) => player.id),
+  standings: toStandings(previewLiveCrowdedSnapshot.players)
 };
 
 export const previewMatchResult: MatchResult = {

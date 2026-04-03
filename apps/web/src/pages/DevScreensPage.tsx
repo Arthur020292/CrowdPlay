@@ -4,6 +4,7 @@ import { getPlayerAccentHex, getPlayerAvatarPreset, type PlayerAvatarId, type Sn
 
 import { AvatarBadge } from "../components/AvatarBadge";
 import { HostLobbyStage } from "../components/HostLobbyStage";
+import { HostPodium } from "../components/HostPodium";
 import { JoinCodePanel } from "../components/JoinCodePanel";
 import { Leaderboard } from "../components/Leaderboard";
 import { LobbyRosterGrid } from "../components/LobbyRosterGrid";
@@ -11,7 +12,11 @@ import { PlayerIdentityPanel } from "../components/PlayerIdentityPanel";
 import { RaceCanvas } from "../components/RaceCanvas";
 import {
   previewCountdownSnapshot,
+  previewCrowdedRoster,
+  previewCrowdedFinishedEvent,
   previewFinishedEvent,
+  previewLiveCrowdedPreviousSnapshot,
+  previewLiveCrowdedSnapshot,
   previewLivePreviousSnapshot,
   previewLiveSnapshot,
   previewMatchResult,
@@ -45,11 +50,7 @@ function LandingPreview() {
     <div className="flex min-h-[32rem] items-center justify-center">
       <section className="w-full max-w-4xl px-8 py-12 text-center sm:px-12 sm:py-16">
         <h1 className="mx-auto max-w-3xl text-4xl font-black tracking-tight text-slate-900 sm:text-6xl">Choose how you want to play.</h1>
-        <p className="mx-auto mt-4 max-w-2xl text-lg text-slate-600">
-          Host a game on the big screen or join one from your phone. That&apos;s it.
-        </p>
-
-        <div className="mt-10 grid gap-4 sm:mx-auto sm:max-w-2xl sm:grid-cols-2">
+        <div className="mt-8 grid gap-4 sm:mx-auto sm:max-w-2xl sm:grid-cols-2">
           <button className="cp-button-primary min-h-[4.75rem] text-lg font-black">Host a Game</button>
           <button className="cp-button-secondary min-h-[4.75rem] text-lg font-black">Join a Game</button>
         </div>
@@ -63,11 +64,8 @@ function HostGamesPreview() {
     <div>
       <span className="cp-eyebrow cp-eyebrow-light">Choose a game</span>
       <h1 className="mt-5 text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">Pick what the room will play.</h1>
-      <p className="mt-3 max-w-2xl text-base text-slate-600 sm:text-lg">
-        TapDash is ready to host now. More party games will appear here as CrowdPlay grows.
-      </p>
 
-      <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         {Array.from({ length: 10 }, (_, index) => {
           const isLive = index === 0;
           return (
@@ -102,7 +100,8 @@ function HostRacePreview({
   players,
   snapshot,
   previousSnapshot,
-  podiumNames
+  lanePlayerIds,
+  podiumStandings
 }: {
   code: string;
   phase: string;
@@ -110,45 +109,46 @@ function HostRacePreview({
   players: Parameters<typeof Leaderboard>[0]["players"];
   snapshot: SnapshotEvent | null;
   previousSnapshot: SnapshotEvent | null;
-  podiumNames?: string[];
+  lanePlayerIds?: string[];
+  podiumStandings?: typeof previewFinishedEvent.standings;
 }) {
   return (
-    <div className="grid gap-6 xl:grid-cols-[1.4fr_0.6fr]">
-      <div className="cp-card-panel p-6">
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-sm uppercase tracking-[0.35em] text-sky-700/80">Host Screen</p>
-            <h1 className="mt-2 text-4xl font-black tracking-tight text-slate-950">{code}</h1>
-            <p className="mt-2 text-sm text-slate-500">Socket open • Phase {phase}</p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="rounded-full border border-slate-200 bg-white/[0.84] px-4 py-2 text-sm font-medium text-slate-600">
-              Remaining {formatRemainingLabel(phase, remainingMs)}
-            </div>
-            <button className="cp-button-primary px-5 py-3 text-sm">Start race</button>
-            <button className="cp-button-secondary px-5 py-3 text-sm">Stop</button>
-          </div>
-        </div>
-
-        {snapshot ? (
-          <RaceCanvas snapshot={snapshot} previousSnapshot={previousSnapshot} />
+    <div className="grid gap-6 xl:min-h-[calc(100vh-3rem)] xl:grid-cols-[1.4fr_0.6fr]">
+      <div className="flex min-h-0 flex-col">
+        {podiumStandings ? (
+          <HostPodium
+            standings={podiumStandings}
+            action={<button className="cp-button-secondary px-4 py-2 text-sm">Open results</button>}
+          />
+        ) : snapshot ? (
+          <RaceCanvas
+            snapshot={snapshot}
+            previousSnapshot={previousSnapshot}
+            className="min-h-[420px] flex-1"
+            lanePlayerIds={lanePlayerIds}
+          />
         ) : (
           <div className="flex h-[360px] items-center justify-center rounded-[2rem] border border-dashed border-white/15 bg-slate-950/60 text-center text-slate-400">
             Race view arms on countdown. Use the lobby preview to review pre-game layout.
           </div>
         )}
-
-        {podiumNames ? (
-          <div className="mt-6 rounded-[1.75rem] border border-amber-200 bg-amber-50/90 p-5">
-            <div className="text-sm uppercase tracking-[0.35em] text-amber-700/80">Podium</div>
-            <div className="mt-3 text-2xl font-black text-slate-950">{podiumNames.join(" • ")}</div>
-            <button className="cp-button-secondary mt-4 px-4 py-2 text-sm">Open results</button>
-          </div>
-        ) : null}
       </div>
 
-      <Leaderboard players={players} title={phase === "finished" ? "Final standings" : "Live standings"} />
+      <Leaderboard
+        players={players}
+        title={phase === "finished" ? "Final standings" : "Live standings"}
+        scrollable={phase === "live" || phase === "finished"}
+        headerActions={
+          phase === "live" ? (
+            <>
+              <div className="rounded-full border border-slate-200 bg-white/[0.84] px-4 py-2 text-sm font-medium text-slate-600">
+                Remaining {formatRemainingLabel(phase, remainingMs)}
+              </div>
+              <button className="cp-button-secondary px-5 py-3 text-sm">Stop</button>
+            </>
+          ) : null
+        }
+      />
     </div>
   );
 }
@@ -279,13 +279,31 @@ export function DevScreensPage() {
         <JoinCodePanel code={joinCode} onCodeChange={setJoinCode} onSubmit={noopSubmit} />
       </DevSection>
 
-      <DevSection title="Player identity" description="Friendly name-and-avatar step after the code is entered.">
+      <DevSection title="Player name" description="Focused first step for choosing a display name.">
         <PlayerIdentityPanel
           code="DEMO5"
           name={name}
           avatarId={avatarId}
+          step="name"
           onNameChange={setName}
           onAvatarChange={setAvatarId}
+          onContinue={() => undefined}
+          onBack={() => undefined}
+          onSubmit={noopSubmit}
+          ctaLabel="Continue"
+        />
+      </DevSection>
+
+      <DevSection title="Player avatar" description="Second step for choosing an avatar after the name is locked in.">
+        <PlayerIdentityPanel
+          code="DEMO5"
+          name={name}
+          avatarId={avatarId}
+          step="avatar"
+          onNameChange={setName}
+          onAvatarChange={setAvatarId}
+          onContinue={() => undefined}
+          onBack={() => undefined}
           onSubmit={noopSubmit}
           ctaLabel="Enter game"
         />
@@ -318,10 +336,11 @@ export function DevScreensPage() {
         <HostRacePreview
           code="DEMO5"
           phase="live"
-          remainingMs={previewLiveSnapshot.remainingMs}
-          players={previewLiveSnapshot.players}
-          snapshot={previewLiveSnapshot}
-          previousSnapshot={previewLivePreviousSnapshot}
+          remainingMs={previewLiveCrowdedSnapshot.remainingMs}
+          players={previewLiveCrowdedSnapshot.players}
+          snapshot={previewLiveCrowdedSnapshot}
+          previousSnapshot={previewLiveCrowdedPreviousSnapshot}
+          lanePlayerIds={previewCrowdedRoster.map((player) => player.id)}
         />
       </DevSection>
 
@@ -330,10 +349,10 @@ export function DevScreensPage() {
           code="DEMO5"
           phase="finished"
           remainingMs={0}
-          players={previewFinishedEvent.standings}
+          players={previewCrowdedFinishedEvent.standings}
           snapshot={previewSprintSnapshot}
           previousSnapshot={previewLiveSnapshot}
-          podiumNames={previewFinishedEvent.standings.slice(0, 3).map((standing) => standing.name)}
+          podiumStandings={previewCrowdedFinishedEvent.standings}
         />
       </DevSection>
 
