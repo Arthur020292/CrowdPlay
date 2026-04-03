@@ -1,6 +1,6 @@
 import { FormEvent, useState } from "react";
 
-import { getPlayerAccentHex, getPlayerAvatarPreset, type PlayerAvatarId, type SnapshotEvent } from "@crowdplay/protocol";
+import { getPlayerAccentHex, getPlayerAvatarPreset, type PlayerAvatarId, type PlayerStateEvent, type SnapshotEvent } from "@crowdplay/protocol";
 
 import { AvatarBadge } from "../components/AvatarBadge";
 import { HostLobbyStage } from "../components/HostLobbyStage";
@@ -12,16 +12,17 @@ import { PlayerIdentityPanel } from "../components/PlayerIdentityPanel";
 import { RaceCanvas } from "../components/RaceCanvas";
 import {
   previewCountdownSnapshot,
-  previewCrowdedRoster,
   previewCrowdedFinishedEvent,
+  previewCrowdedRoster,
   previewFinishedEvent,
   previewLiveCrowdedPreviousSnapshot,
   previewLiveCrowdedSnapshot,
-  previewLivePreviousSnapshot,
-  previewLiveSnapshot,
   previewMatchResult,
-  previewRoster,
-  previewSprintSnapshot
+  previewPlayerEffectState,
+  previewPlayerLockoutState,
+  previewPlayerQuestionState,
+  previewPlayerRewardState,
+  previewRoster
 } from "../dev/fixtures";
 import { formatRemainingLabel } from "../lib/time";
 
@@ -75,14 +76,14 @@ function HostGamesPreview() {
                   {isLive ? "Live" : "Coming soon"}
                 </span>
                 <span className={`inline-flex size-11 items-center justify-center rounded-[1rem] border-4 text-lg font-black ${isLive ? "border-sky-300 bg-gradient-to-b from-cyan-200 to-sky-400 text-sky-900" : "border-slate-300 bg-white/[0.78] text-slate-400"}`}>
-                  {isLive ? "TD" : "?"}
+                  {isLive ? "QD" : "?"}
                 </span>
               </div>
-              <div className="mt-5 text-2xl font-black text-slate-950">{isLive ? "TapDash" : "Coming soon"}</div>
-              <p className="mt-2 text-sm leading-6 text-slate-600">{isLive ? "Rapid tapping race for a shared screen." : "More CrowdPlay party games are on the way."}</p>
+              <div className="mt-5 text-2xl font-black text-slate-950">{isLive ? "QuizDash" : "Coming soon"}</div>
+              <p className="mt-2 text-sm leading-6 text-slate-600">{isLive ? "Answer fast, pick rewards, and survive the chaos." : "More CrowdPlay party games are on the way."}</p>
               <div className="mt-5">
                 <span className={isLive ? "cp-button-primary min-h-[3.8rem] min-w-[10rem] text-base font-black" : "inline-flex min-h-[3.8rem] min-w-[10rem] items-center justify-center rounded-[1.3rem] border border-slate-200/80 bg-white/[0.58] px-4 py-3 text-sm font-black uppercase tracking-[0.18em] text-slate-400"}>
-                  {isLive ? "Play TapDash" : "Soon"}
+                  {isLive ? "Play QuizDash" : "Soon"}
                 </span>
               </div>
             </div>
@@ -94,7 +95,6 @@ function HostGamesPreview() {
 }
 
 function HostRacePreview({
-  code,
   phase,
   remainingMs,
   players,
@@ -103,7 +103,6 @@ function HostRacePreview({
   lanePlayerIds,
   podiumStandings
 }: {
-  code: string;
   phase: string;
   remainingMs: number;
   players: Parameters<typeof Leaderboard>[0]["players"];
@@ -127,11 +126,7 @@ function HostRacePreview({
             className="min-h-[420px] flex-1"
             lanePlayerIds={lanePlayerIds}
           />
-        ) : (
-          <div className="flex h-[360px] items-center justify-center rounded-[2rem] border border-dashed border-white/15 bg-slate-950/60 text-center text-slate-400">
-            Race view arms on countdown. Use the lobby preview to review pre-game layout.
-          </div>
-        )}
+        ) : null}
       </div>
 
       <Leaderboard
@@ -153,66 +148,101 @@ function HostRacePreview({
   );
 }
 
-function PlayerLivePreview({ snapshot, phase, remainingMs }: { snapshot: SnapshotEvent; phase: string; remainingMs: number }) {
-  const me = snapshot.players[0];
-  const leaderDistance = snapshot.players[0]?.d ?? 1;
-  const progress = Math.min((me.d / Math.max(leaderDistance, 1)) * 100, 100);
+function PlayerGamePreview({
+  playerState,
+  snapshot,
+  phase,
+  remainingMs
+}: {
+  playerState: PlayerStateEvent;
+  snapshot: SnapshotEvent | null;
+  phase: string;
+  remainingMs: number;
+}) {
+  const me = snapshot?.players.find((player) => player.id === playerState.playerId);
+  const leaderDistance = snapshot?.players[0]?.d ?? 1;
+  const progress = Math.min((playerState.distance / Math.max(leaderDistance, 1)) * 100, 100);
+  const accentAvatarId = me?.avatarId ?? "fox";
+  const lockoutRemainingMs = playerState.lockoutEndsAt ? Math.max(0, playerState.lockoutEndsAt - Date.now()) : 0;
 
   return (
-    <div className="mx-auto flex max-w-xl flex-col gap-6">
+    <div className="mx-auto flex max-w-2xl flex-col gap-6">
       <section className="cp-card-dark p-6 text-center">
-        <p className="text-sm uppercase tracking-[0.35em] text-cyan-200/80">Phone Controller</p>
-        <h1 className="mt-3 text-4xl font-black text-white">{me.name}</h1>
-        <p className="mt-2 text-sm text-slate-400">Session DEMO5 • Socket open • Phase {phase}</p>
+        <h1 className="text-4xl font-black text-white">Ava</h1>
         <div className="mt-4 inline-flex items-center gap-3 rounded-full border border-white/10 bg-white/[0.08] px-3 py-2 text-sm text-slate-200">
-          <AvatarBadge avatarId={me.avatarId} size={40} />
-          {getPlayerAvatarPreset(me.avatarId).label}
+          <AvatarBadge avatarId={accentAvatarId} size={40} />
+          {getPlayerAvatarPreset(accentAvatarId).label}
         </div>
 
         <div className="mt-6 rounded-[1.5rem] border border-white/10 bg-white/[0.07] p-4">
-          <div className="flex items-center justify-between text-sm text-slate-300">
-            <span>Rank</span>
-            <span className="text-lg font-semibold text-white">{me.r}</span>
-          </div>
-          <div className="mt-3 flex items-center justify-between text-sm text-slate-300">
-            <span>Distance</span>
-            <span className="text-lg font-semibold" style={{ color: getPlayerAccentHex(me.avatarId) }}>{me.d.toFixed(1)}m</span>
-          </div>
-          <div className="mt-3 flex items-center justify-between text-sm text-slate-300">
-            <span>Remaining</span>
-            <span className="text-lg font-semibold text-white">{formatRemainingLabel(phase, remainingMs)}</span>
+          <div className="grid gap-3 sm:grid-cols-4">
+            <div className="rounded-[1.25rem] bg-slate-950/50 px-4 py-3">
+              <div className="text-xs uppercase tracking-[0.25em] text-slate-400">Rank</div>
+              <div className="mt-2 text-2xl font-black text-white">{playerState.rank}</div>
+            </div>
+            <div className="rounded-[1.25rem] bg-slate-950/50 px-4 py-3">
+              <div className="text-xs uppercase tracking-[0.25em] text-slate-400">Distance</div>
+              <div className="mt-2 text-2xl font-black" style={{ color: getPlayerAccentHex(accentAvatarId) }}>
+                {playerState.distance.toFixed(1)}m
+              </div>
+            </div>
+            <div className="rounded-[1.25rem] bg-slate-950/50 px-4 py-3">
+              <div className="text-xs uppercase tracking-[0.25em] text-slate-400">Correct</div>
+              <div className="mt-2 text-2xl font-black text-white">{playerState.correctAnswers}</div>
+            </div>
+            <div className="rounded-[1.25rem] bg-slate-950/50 px-4 py-3">
+              <div className="text-xs uppercase tracking-[0.25em] text-slate-400">Remaining</div>
+              <div className="mt-2 text-2xl font-black text-white">{formatRemainingLabel(phase, remainingMs)}</div>
+            </div>
           </div>
           <div className="mt-4 h-3 overflow-hidden rounded-full bg-white/10">
-            <div className="h-full rounded-full transition-all" style={{ width: `${progress}%`, backgroundColor: getPlayerAccentHex(me.avatarId) }} />
+            <div className="h-full rounded-full transition-all" style={{ width: `${progress}%`, backgroundColor: getPlayerAccentHex(accentAvatarId) }} />
           </div>
         </div>
 
-        <button className="mt-6 inline-flex min-h-56 w-full items-center justify-center rounded-[2.4rem] bg-gradient-to-br from-cyan-200 via-sky-300 to-blue-500 px-4 py-10 text-4xl font-black uppercase tracking-[0.2em] text-slate-950 shadow-2xl shadow-cyan-500/30">
-          {phase === "live" ? "Tap" : phase === "countdown" ? "Ready" : "Finished"}
-        </button>
-      </section>
-    </div>
-  );
-}
+        {playerState.recentOutcome ? (
+          <div className="mt-6 rounded-[1.5rem] border border-cyan-300/20 bg-cyan-400/10 px-5 py-4 text-left">
+            <div className="text-xs font-black uppercase tracking-[0.3em] text-cyan-200">{playerState.recentOutcome.title}</div>
+            <div className="mt-2 text-sm text-slate-200">{playerState.recentOutcome.detail}</div>
+          </div>
+        ) : null}
 
-function PlayerResultsPreview() {
-  return (
-    <div className="mx-auto flex max-w-xl flex-col gap-6">
-      <PlayerLivePreview snapshot={previewSprintSnapshot} phase="finished" remainingMs={0} />
-
-      <section className="cp-card-dark border-amber-300/20 bg-[linear-gradient(180deg,rgba(120,53,15,0.28),rgba(8,18,37,0.84))] p-6">
-        <p className="text-sm uppercase tracking-[0.35em] text-amber-200/80">Match complete</p>
-        <h2 className="mt-2 text-2xl font-black text-white">Top finishers</h2>
-        <div className="mt-4 space-y-2">
-          {previewFinishedEvent.standings.slice(0, 5).map((standing) => (
-            <div key={standing.playerId} className="flex items-center justify-between rounded-2xl bg-slate-950/50 px-4 py-3">
-              <span className="font-semibold text-white">
-                {standing.rank}. {standing.name}
-              </span>
-              <span className="text-sm text-cyan-200">{standing.distance.toFixed(1)}m</span>
+        {phase === "finished" ? (
+          <div className="mt-6 rounded-[1.75rem] border border-amber-300/20 bg-[linear-gradient(180deg,rgba(120,53,15,0.28),rgba(8,18,37,0.84))] p-6 text-left">
+            <div className="text-xs font-black uppercase tracking-[0.3em] text-amber-200/80">Match complete</div>
+            <h2 className="mt-3 text-2xl font-black text-white">The race is over.</h2>
+            <p className="mt-3 text-sm leading-6 text-slate-300">Check the host screen for the podium or scroll down here for the final standings.</p>
+          </div>
+        ) : playerState.pendingRewardChoice ? (
+          <div className="mt-6 rounded-[1.75rem] border border-white/10 bg-white/[0.06] p-6 text-left">
+            <div className="text-xs font-black uppercase tracking-[0.3em] text-sky-200">Choose your reward</div>
+            <h2 className="mt-3 text-2xl font-black text-white">Play it safe or open chaos.</h2>
+            <div className="mt-6 grid gap-4 md:grid-cols-2">
+              <button className="cp-button-primary min-h-[4.5rem] text-base font-black">Move forward</button>
+              <button className="cp-button-secondary min-h-[4.5rem] text-base font-black">Random effect</button>
             </div>
-          ))}
-        </div>
+          </div>
+        ) : playerState.lockoutEndsAt ? (
+          <div className="mt-6 rounded-[1.75rem] border border-rose-300/20 bg-rose-400/10 p-6 text-left">
+            <div className="text-xs font-black uppercase tracking-[0.3em] text-rose-200">Locked out</div>
+            <h2 className="mt-3 text-2xl font-black text-white">Next question unlocks in {Math.max(1, Math.ceil(lockoutRemainingMs / 1000))}s.</h2>
+            <p className="mt-3 text-sm leading-6 text-slate-300">Wrong answers trigger a short freeze before the next question goes live.</p>
+          </div>
+        ) : playerState.currentQuestion ? (
+          <div className="mt-6 rounded-[1.75rem] border border-white/10 bg-white/[0.06] p-6 text-left">
+            <div className="text-xs font-black uppercase tracking-[0.3em] text-cyan-200">
+              {playerState.currentQuestion.format === "boolean" ? "True or false" : "Multiple choice"}
+            </div>
+            <h2 className="mt-3 text-2xl font-black text-white">{playerState.currentQuestion.prompt}</h2>
+            <div className="mt-6 grid gap-3">
+              {playerState.currentQuestion.options.map((option) => (
+                <div key={option.id} className="rounded-[1.4rem] border border-white/12 bg-white/[0.08] px-5 py-4 text-base font-semibold text-white">
+                  {option.label}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </section>
     </div>
   );
@@ -225,8 +255,7 @@ function ResultsPreviewCard() {
         <p className="text-sm uppercase tracking-[0.35em] text-cyan-200/80">Match result</p>
         <h1 className="mt-3 text-4xl font-black text-white">Session {previewMatchResult.code}</h1>
         <p className="mt-4 text-slate-300">
-          {previewMatchResult.playerCount} players • {Math.round(previewMatchResult.durationMs / 1000)} second race • Winning distance{" "}
-          {previewMatchResult.stats.winningDistance.toFixed(1)}m
+          {previewMatchResult.playerCount} players • {Math.round(previewMatchResult.durationMs / 1000)} second race • Winning distance {previewMatchResult.stats.winningDistance.toFixed(1)}m
         </p>
 
         <div className="mt-6 grid gap-4 sm:grid-cols-3">
@@ -235,12 +264,12 @@ function ResultsPreviewCard() {
             <div className="mt-2 text-2xl font-black text-white">{previewMatchResult.winners.length}</div>
           </div>
           <div className="rounded-[1.5rem] border border-white/10 bg-slate-950/70 p-4">
-            <div className="text-xs uppercase tracking-[0.35em] text-slate-400">Total taps</div>
-            <div className="mt-2 text-2xl font-black text-white">{previewMatchResult.stats.totalTaps}</div>
+            <div className="text-xs uppercase tracking-[0.35em] text-slate-400">Correct answers</div>
+            <div className="mt-2 text-2xl font-black text-white">{previewMatchResult.stats.totalCorrectAnswers}</div>
           </div>
           <div className="rounded-[1.5rem] border border-white/10 bg-slate-950/70 p-4">
-            <div className="text-xs uppercase tracking-[0.35em] text-slate-400">Average taps</div>
-            <div className="mt-2 text-2xl font-black text-white">{previewMatchResult.stats.averageTapsPerPlayer.toFixed(1)}</div>
+            <div className="text-xs uppercase tracking-[0.35em] text-slate-400">Chaos effects</div>
+            <div className="mt-2 text-2xl font-black text-white">{previewMatchResult.stats.totalEffectsTriggered}</div>
           </div>
         </div>
       </section>
@@ -254,16 +283,15 @@ export function DevScreensPage() {
   const [joinCode, setJoinCode] = useState("DEMO5");
   const [name, setName] = useState("Ava");
   const [avatarId, setAvatarId] = useState<PlayerAvatarId>("fox");
-
   const noopSubmit = (event: FormEvent<HTMLFormElement>) => event.preventDefault();
 
   return (
     <div className="space-y-12">
       <section className="rounded-[2rem] border border-cyan-300/20 bg-cyan-400/10 p-6">
         <p className="cp-dev-text text-sm uppercase tracking-[0.35em]">Dev Preview</p>
-        <h1 className="cp-dev-text mt-3 text-4xl font-black">TapDash screen gallery</h1>
+        <h1 className="cp-dev-text mt-3 text-4xl font-black">QuizDash screen gallery</h1>
         <p className="cp-dev-subtext mt-3 max-w-3xl">
-          Review the redesigned onboarding and host screens without creating a live session. These are fixture-driven snapshots for visual iteration.
+          Review the quiz-race onboarding, host states, player question flow, and podium/results screens without creating a live session.
         </p>
       </section>
 
@@ -271,7 +299,7 @@ export function DevScreensPage() {
         <LandingPreview />
       </DevSection>
 
-      <DevSection title="Host game picker" description="Full host flow after pressing Host a Game, with TapDash first and the rest marked coming soon.">
+      <DevSection title="Host game picker" description="QuizDash leads the host flow, with the rest reserved for future games.">
         <HostGamesPreview />
       </DevSection>
 
@@ -294,7 +322,7 @@ export function DevScreensPage() {
         />
       </DevSection>
 
-      <DevSection title="Player avatar" description="Second step for choosing an avatar after the name is locked in.">
+      <DevSection title="Player avatar" description="Second step for choosing an avatar before entering the match.">
         <PlayerIdentityPanel
           code="DEMO5"
           name={name}
@@ -309,21 +337,18 @@ export function DevScreensPage() {
         />
       </DevSection>
 
-      <DevSection title="Host lobby" description="Game code hero, readiness state, and friendlier roster cards before the race begins.">
+      <DevSection title="Host lobby" description="Game code hero and roster before the quiz race begins.">
         <div className="space-y-6">
-          <HostLobbyStage
-            code="DEMO5"
-            gameLabel="TapDash"
-          />
+          <HostLobbyStage code="DEMO5" gameLabel="QuizDash" />
           <LobbyRosterGrid players={previewRoster} />
         </div>
       </DevSection>
 
-      <DevSection title="Host countdown" description="Countdown stays in the lobby, then switches to the race screen once it ends.">
+      <DevSection title="Host countdown" description="Countdown stays in the lobby, then players begin answering on their own devices.">
         <div className="space-y-6">
           <HostLobbyStage
             code="DEMO5"
-            gameLabel="TapDash"
+            gameLabel="QuizDash"
             phase="countdown"
             remainingMs={previewCountdownSnapshot.remainingMs}
             playerCount={previewRoster.length}
@@ -332,9 +357,8 @@ export function DevScreensPage() {
         </div>
       </DevSection>
 
-      <DevSection title="Host live race" description="Mid-race state with active standings, motion interpolation, and leaderboard updates.">
+      <DevSection title="Host live race" description="Mid-race state with stable lanes, live standings, and a larger simulated field.">
         <HostRacePreview
-          code="DEMO5"
           phase="live"
           remainingMs={previewLiveCrowdedSnapshot.remainingMs}
           players={previewLiveCrowdedSnapshot.players}
@@ -344,24 +368,35 @@ export function DevScreensPage() {
         />
       </DevSection>
 
-      <DevSection title="Host podium" description="End-of-match state with the podium callout and final standings.">
+      <DevSection title="Host podium" description="End-of-match state with podium treatment and scrollable final standings.">
         <HostRacePreview
-          code="DEMO5"
           phase="finished"
           remainingMs={0}
           players={previewCrowdedFinishedEvent.standings}
-          snapshot={previewSprintSnapshot}
-          previousSnapshot={previewLiveSnapshot}
+          snapshot={null}
+          previousSnapshot={null}
           podiumStandings={previewCrowdedFinishedEvent.standings}
         />
       </DevSection>
 
-      <DevSection title="Player live controller" description="Tap surface, player rank card, and controller chrome during the race.">
-        <PlayerLivePreview snapshot={previewLiveSnapshot} phase="live" remainingMs={previewLiveSnapshot.remainingMs} />
+      <DevSection title="Player question" description="Primary answering state for multiple choice and true/false prompts.">
+        <PlayerGamePreview playerState={previewPlayerQuestionState} snapshot={previewLiveCrowdedSnapshot} phase="live" remainingMs={previewLiveCrowdedSnapshot.remainingMs} />
       </DevSection>
 
-      <DevSection title="Player post-match" description="Controller end state with final standings and the disabled tap button.">
-        <PlayerResultsPreview />
+      <DevSection title="Player reward choice" description="Correct answers lead to a choice between safe progress and random chaos.">
+        <PlayerGamePreview playerState={previewPlayerRewardState} snapshot={previewLiveCrowdedSnapshot} phase="live" remainingMs={previewLiveCrowdedSnapshot.remainingMs} />
+      </DevSection>
+
+      <DevSection title="Player lockout" description="Wrong answers trigger a temporary freeze before the next question unlocks.">
+        <PlayerGamePreview playerState={previewPlayerLockoutState} snapshot={previewLiveCrowdedSnapshot} phase="live" remainingMs={previewLiveCrowdedSnapshot.remainingMs} />
+      </DevSection>
+
+      <DevSection title="Player chaos outcome" description="Random effects can steal, swap, trap, or launch a player forward.">
+        <PlayerGamePreview playerState={previewPlayerEffectState} snapshot={previewLiveCrowdedSnapshot} phase="live" remainingMs={previewLiveCrowdedSnapshot.remainingMs} />
+      </DevSection>
+
+      <DevSection title="Player post-match" description="Controller end state after time runs out.">
+        <PlayerGamePreview playerState={previewPlayerEffectState} snapshot={previewLiveCrowdedSnapshot} phase="finished" remainingMs={0} />
       </DevSection>
 
       <DevSection title="Results page" description="Standalone match summary screen after the host opens results.">

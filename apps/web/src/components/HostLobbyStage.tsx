@@ -51,7 +51,7 @@ export function HostLobbyStage({
 
         {isCountdown ? (
           <div className="mt-6 rounded-[1.6rem] border border-sky-100 bg-sky-50/80 px-5 py-4 text-center text-sm font-medium text-sky-900">
-            Locking in the lobby and getting everyone ready. The race begins as soon as the countdown ends.
+            Locking in the lobby and dealing the first questions. The quiz race begins as soon as the countdown ends.
           </div>
         ) : null}
       </div>

@@ -8,7 +8,7 @@ Durable Objects, D1, React, and Canvas.
 - `apps/web`: React + Vite host/player client
 - `apps/worker`: Cloudflare Worker APIs and `GameSessionDurableObject`
 - `packages/protocol`: shared message schemas and data models
-- `packages/game-tapdash`: TapDash race simulation and ranking logic
+- `packages/game-quizdash`: QuizDash question, reward, and race simulation logic
 
 ## Getting Started
 

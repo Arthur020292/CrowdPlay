@@ -32,7 +32,7 @@ export function ResultsPage() {
         <p className="text-sm uppercase tracking-[0.35em] text-cyan-200/80">Match result</p>
         <h1 className="mt-3 text-4xl font-black text-white">Session {result.code}</h1>
         <p className="mt-4 text-slate-300">
-          {result.playerCount} players • {Math.round(result.durationMs / 1000)} second race • Winning distance {result.stats.winningDistance.toFixed(1)}m
+          {result.playerCount} players • {Math.round(result.durationMs / 1000)} second match • Winning distance {result.stats.winningDistance.toFixed(1)}m
         </p>
 
         <div className="mt-6 grid gap-4 sm:grid-cols-3">
@@ -41,12 +41,12 @@ export function ResultsPage() {
             <div className="mt-2 text-2xl font-black text-white">{result.winners.length}</div>
           </div>
           <div className="rounded-[1.5rem] border border-white/10 bg-slate-950/70 p-4">
-            <div className="text-xs uppercase tracking-[0.35em] text-slate-400">Total taps</div>
-            <div className="mt-2 text-2xl font-black text-white">{result.stats.totalTaps}</div>
+            <div className="text-xs uppercase tracking-[0.35em] text-slate-400">Correct answers</div>
+            <div className="mt-2 text-2xl font-black text-white">{result.stats.totalCorrectAnswers}</div>
           </div>
           <div className="rounded-[1.5rem] border border-white/10 bg-slate-950/70 p-4">
-            <div className="text-xs uppercase tracking-[0.35em] text-slate-400">Average taps</div>
-            <div className="mt-2 text-2xl font-black text-white">{result.stats.averageTapsPerPlayer.toFixed(1)}</div>
+            <div className="text-xs uppercase tracking-[0.35em] text-slate-400">Chaos effects</div>
+            <div className="mt-2 text-2xl font-black text-white">{result.stats.totalEffectsTriggered}</div>
           </div>
         </div>
       </section>

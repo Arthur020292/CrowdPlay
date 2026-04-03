@@ -9,7 +9,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@crowdplay/game-tapdash": "0.1.0",
+    "@crowdplay/game-quizdash": "0.1.0",
     "@crowdplay/protocol": "0.1.0"
   },
   "devDependencies": {
