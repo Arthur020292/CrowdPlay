@@ -24,9 +24,11 @@ export function PlayPage() {
   const params = useParams();
   const code = params.code?.toUpperCase() ?? "";
   const stored = getPlayerSession(code);
+  const storedName = stored?.name ?? "";
 
-  const [name, setName] = useState(stored?.name ?? "");
+  const [name, setName] = useState(storedName);
   const [avatarId, setAvatarId] = useState<PlayerAvatarId>(coercePlayerAvatarId(stored?.avatarId, 0) ?? getDefaultPlayerAvatar());
+  const [identityStep, setIdentityStep] = useState<"name" | "avatar">(storedName.trim() ? "avatar" : "name");
   const [playerId, setPlayerId] = useState(stored?.playerId ?? "");
   const [playerToken, setPlayerToken] = useState(stored?.playerToken ?? "");
   const [phase, setPhase] = useState("lobby");
@@ -129,8 +131,20 @@ export function PlayPage() {
           code={code}
           name={name}
           avatarId={avatarId}
+          step={identityStep}
           onNameChange={setName}
           onAvatarChange={setAvatarId}
+          onContinue={() => {
+            if (!name.trim()) {
+              return;
+            }
+            setError(null);
+            setIdentityStep("avatar");
+          }}
+          onBack={() => {
+            setError(null);
+            setIdentityStep("name");
+          }}
           onSubmit={handleJoin}
           ctaLabel="Enter game"
           error={error}

@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { MatchStanding, RosterPlayer, SnapshotPlayer } from "@crowdplay/protocol";
 
 import { AvatarBadge } from "./AvatarBadge";
@@ -7,17 +8,22 @@ type Row = MatchStanding | RosterPlayer | SnapshotPlayer;
 interface LeaderboardProps {
   players: Row[];
   title: string;
+  scrollable?: boolean;
+  headerActions?: ReactNode;
 }
 
-export function Leaderboard({ players, title }: LeaderboardProps) {
+export function Leaderboard({ players, title, scrollable = false, headerActions }: LeaderboardProps) {
   return (
-    <section className="cp-card-panel p-5">
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-slate-950">{title}</h2>
-        <span className="rounded-full border border-slate-200 bg-white/[0.8] px-3 py-1 text-xs uppercase tracking-[0.3em] text-slate-500">{players.length} players</span>
+    <section className={`cp-card-panel p-5 ${scrollable ? "flex flex-col xl:self-start xl:max-h-[calc(100vh-3rem)]" : ""}`.trim()}>
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <h2 className="text-lg font-semibold text-slate-950">{title}</h2>
+          <span className="rounded-full border border-slate-200 bg-white/[0.8] px-3 py-1 text-xs uppercase tracking-[0.3em] text-slate-500">{players.length} players</span>
+        </div>
+        {headerActions ? <div className="flex flex-wrap items-center gap-3">{headerActions}</div> : null}
       </div>
 
-      <div className="space-y-2">
+      <div className={`${scrollable ? "min-h-0 space-y-2 overflow-y-auto pr-1" : "space-y-2"}`.trim()}>
         {players.map((player, index) => (
           <div
             key={"playerId" in player ? player.playerId : player.id}

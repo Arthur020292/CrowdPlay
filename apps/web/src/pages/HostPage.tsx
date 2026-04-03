@@ -4,6 +4,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { MatchFinishedEvent, RosterPlayer, SnapshotEvent } from "@crowdplay/protocol";
 
 import { HostLobbyStage } from "../components/HostLobbyStage";
+import { HostPodium } from "../components/HostPodium";
 import { Leaderboard } from "../components/Leaderboard";
 import { LobbyRosterGrid } from "../components/LobbyRosterGrid";
 import { RaceCanvas } from "../components/RaceCanvas";
@@ -56,6 +57,8 @@ export function HostPage() {
           break;
         case "match_finished":
           setResult(event);
+          setPhase("finished");
+          setRemainingMs(0);
           break;
         case "error":
           setError(event.message);
@@ -105,57 +108,53 @@ export function HostPage() {
 
   return (
     <div className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
-      <section className="grid gap-6 xl:grid-cols-[1.4fr_0.6fr]">
-        <div className="cp-card-panel p-6">
-          <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-sm uppercase tracking-[0.35em] text-sky-700/80">Host Screen</p>
-              <h1 className="mt-2 text-4xl font-black tracking-tight text-slate-950">{code}</h1>
-              <p className="mt-2 text-sm text-slate-500">Socket {status} • Phase {phase}</p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="rounded-full border border-slate-200 bg-white/[0.84] px-4 py-2 text-sm font-medium text-slate-600">
-                Remaining {formatRemainingLabel(phase, remainingMs)}
-              </div>
-              <button
-                onClick={() => startSession(code, hostToken).catch((startError) => setError(startError instanceof Error ? startError.message : "Unable to start match."))}
-                disabled={phase !== "lobby" || roster.length < 2}
-                className="cp-button-primary px-5 py-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                Start race
-              </button>
-              <button
-                onClick={() => endSession(code, hostToken).catch((endError) => setError(endError instanceof Error ? endError.message : "Unable to end match."))}
-                disabled={phase !== "live" && phase !== "countdown"}
-                className="cp-button-secondary px-5 py-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                Stop
-              </button>
-            </div>
-          </div>
-
-          <RaceCanvas snapshot={snapshot} previousSnapshot={previousSnapshot} />
-
+      <section className="grid gap-6 xl:min-h-[calc(100vh-3rem)] xl:grid-cols-[1.4fr_0.6fr]">
+        <div className="flex min-h-0 flex-col">
           {result ? (
-            <div className="mt-6 rounded-[1.75rem] border border-amber-200 bg-amber-50/90 p-5">
-              <div className="text-sm uppercase tracking-[0.35em] text-amber-700/80">Podium</div>
-              <div className="mt-3 text-2xl font-black text-slate-950">
-                {result.standings.slice(0, 3).map((standing) => standing.name).join(" • ")}
-              </div>
-              <button
-                onClick={() => navigate(`/results/${result.matchId}`)}
-                className="cp-button-secondary mt-4 px-4 py-2 text-sm"
-              >
-                Open results
-              </button>
-            </div>
-          ) : null}
+            <HostPodium
+              standings={result.standings}
+              action={
+                <button
+                  onClick={() => navigate(`/results/${result.matchId}`)}
+                  className="cp-button-secondary px-4 py-2 text-sm"
+                >
+                  Open results
+                </button>
+              }
+            />
+          ) : (
+            <RaceCanvas
+              snapshot={snapshot}
+              previousSnapshot={previousSnapshot}
+              className="min-h-[420px] flex-1"
+              lanePlayerIds={roster.map((player) => player.id)}
+            />
+          )}
 
           {error ? <p className="mt-4 text-sm text-rose-600">{error}</p> : null}
         </div>
 
-        <Leaderboard players={livePlayers} title={phase === "lobby" ? "Lobby roster" : "Live standings"} />
+        <Leaderboard
+          players={livePlayers}
+          title={phase === "finished" ? "Final standings" : phase === "lobby" ? "Lobby roster" : "Live standings"}
+          scrollable={phase === "live" || phase === "finished"}
+          headerActions={
+            phase === "live" ? (
+              <>
+                <div className="rounded-full border border-slate-200 bg-white/[0.84] px-4 py-2 text-sm font-medium text-slate-600">
+                  Remaining {formatRemainingLabel(phase, remainingMs)}
+                </div>
+                <button
+                  onClick={() => endSession(code, hostToken).catch((endError) => setError(endError instanceof Error ? endError.message : "Unable to end match."))}
+                  disabled={phase !== "live" && phase !== "countdown"}
+                  className="cp-button-secondary px-5 py-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Stop
+                </button>
+              </>
+            ) : null
+          }
+        />
       </section>
     </div>
   );

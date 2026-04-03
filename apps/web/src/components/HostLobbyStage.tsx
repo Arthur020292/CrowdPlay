@@ -40,7 +40,6 @@ export function HostLobbyStage({
               <div className="rounded-[1.8rem] border border-sky-200 bg-white/[0.84] px-6 py-5 text-center shadow-[0_16px_30px_rgba(56,189,248,0.12)]">
                 <div className="text-xs font-black uppercase tracking-[0.3em] text-sky-700/75">Starting in</div>
                 <div className="mt-2 text-5xl font-black tracking-tight text-slate-950">{formatRemainingLabel("countdown", remainingMs)}</div>
-                <div className="mt-2 text-sm text-slate-500">Race screen appears automatically.</div>
               </div>
             ) : (
               <button onClick={onStart} disabled={startDisabled} className="cp-button-primary min-w-[13rem] text-base">

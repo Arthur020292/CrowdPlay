@@ -48,13 +48,10 @@ export function HostGamesPage() {
       <section>
         <span className="cp-eyebrow cp-eyebrow-light">Choose a game</span>
         <h1 className="mt-5 text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">Pick what the room will play.</h1>
-        <p className="mt-3 max-w-2xl text-base text-slate-600 sm:text-lg">
-          TapDash is ready to host now. More party games will appear here as CrowdPlay grows.
-        </p>
 
         {error ? <p className="mt-5 max-w-xl rounded-[1rem] bg-rose-100 px-4 py-3 text-sm font-semibold text-rose-700">{error}</p> : null}
 
-        <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <div className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
           {GAME_TILES.map((tile) => {
             const isLive = tile.id === "tapdash";
 
