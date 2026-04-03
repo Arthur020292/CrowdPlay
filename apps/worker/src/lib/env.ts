@@ -1,4 +1,4 @@
-import type { MatchResult } from "@crowdplay/protocol";
+import type { MatchResult, SessionConfig, SessionPlayer } from "@crowdplay/protocol";
 
 export interface TokenClaims {
   role: "host" | "player";
@@ -18,43 +18,8 @@ export interface PersistedSessionState {
   countdownEndsAt: number | null;
   liveEndsAt: number | null;
   tick: number;
-  config: {
-    gameType: "quizdash";
-    playerLimit: number;
-    raceDurationMs: number;
-    countdownMs: number;
-    tickRateHz: number;
-    snapshotRateHz: number;
-    lockoutMs: number;
-  };
-  players: Array<{
-    playerId: string;
-    name: string;
-    avatarId: "fox" | "panda" | "tiger" | "frog" | "owl" | "shark";
-    joinedAt: number;
-    connected: boolean;
-    lastSeenAt: number;
-    distance: number;
-    rank: number;
-    questionCursor: number;
-    questionSeed: number;
-    correctAnswers: number;
-    wrongAnswers: number;
-    effectCount: number;
-    distanceGained: number;
-    distanceLost: number;
-    lockoutUntil: number | null;
-    pendingRewardChoice: boolean;
-    recentOutcome: {
-      kind: "correct" | "wrong" | "reward";
-      title: string;
-      detail: string;
-      effectType?: "move" | "swap" | "steal" | "trap";
-      distanceDelta?: number;
-      at: number;
-    } | null;
-    status: "connected" | "disconnected" | "finished" | "kicked";
-  }>;
+  config: SessionConfig;
+  players: SessionPlayer[];
   lastResult: MatchResult | null;
 }
 
