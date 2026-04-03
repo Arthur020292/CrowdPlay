@@ -1,6 +1,14 @@
 import { DurableObject } from "cloudflare:workers";
 
-import { acceptTapBatch, buildStandings, stepRace } from "@crowdplay/game-tapdash";
+import {
+  applyRewardChoice,
+  buildStandings,
+  clearExpiredLockout,
+  evaluateAnswer,
+  getQuestionForPlayer,
+  isLockoutActive,
+  syncRanks
+} from "@crowdplay/game-quizdash";
 import {
   PROTOCOL_VERSION,
   coercePlayerAvatarId,
@@ -8,6 +16,7 @@ import {
   parseClientEvent,
   type GamePhase,
   type MatchResult,
+  type PlayerStateEvent,
   type RosterPlayer,
   type ServerEvent,
   type SessionConfig,
@@ -107,6 +116,7 @@ export class GameSessionDurableObject extends DurableObject<Env> {
       this.send(ws, { v: PROTOCOL_VERSION, type: "error", code: "BAD_EVENT", message: "Unsupported client event." });
       return;
     }
+
     const now = Date.now();
 
     if (event.type === "ping") {
@@ -119,6 +129,7 @@ export class GameSessionDurableObject extends DurableObject<Env> {
         if (event.command === "start_match") {
           await this.startCountdown();
         }
+
         if (event.command === "end_match") {
           await this.finishMatch();
         }
@@ -134,17 +145,16 @@ export class GameSessionDurableObject extends DurableObject<Env> {
 
     player.connected = true;
     player.lastSeenAt = now;
+    clearExpiredLockout(player, now);
 
-    if (event.type === "input") {
-      if (this.phase !== "live") {
-        return;
-      }
-      if (event.seq <= player.inputSeq) {
-        return;
-      }
+    if (event.type === "answer") {
+      await this.handlePlayerAnswer(player, event.questionId, event.answerId);
+      return;
+    }
 
-      player.inputSeq = event.seq;
-      acceptTapBatch(player, event.tapCount, event.windowMs);
+    if (event.type === "reward_choice") {
+      await this.handleRewardChoice(player, event.choice);
+      return;
     }
   }
 
@@ -188,9 +198,10 @@ export class GameSessionDurableObject extends DurableObject<Env> {
       this.phase = "expired";
       await this.persistState(true);
       this.closeAllSockets(1001, "Session expired");
-    } else {
-      await this.schedulePhaseAlarm();
+      return;
     }
+
+    await this.schedulePhaseAlarm();
   }
 
   private async restoreIfNeeded(): Promise<void> {
@@ -226,8 +237,9 @@ export class GameSessionDurableObject extends DurableObject<Env> {
           }))
         }
       : null;
+
     this.players = new Map(
-      persisted.players.map((player: PersistedSessionState["players"][number], index) => [
+      persisted.players.map((player, index) => [
         player.playerId,
         {
           ...player,
@@ -293,6 +305,10 @@ export class GameSessionDurableObject extends DurableObject<Env> {
     this.players = new Map();
     this.lastResult = null;
     this.tick = 0;
+    this.startedAt = null;
+    this.endedAt = null;
+    this.countdownEndsAt = null;
+    this.liveEndsAt = null;
 
     await this.persistState(true);
     return Response.json({ ok: true, summary: this.getSummary() });
@@ -317,15 +333,23 @@ export class GameSessionDurableObject extends DurableObject<Env> {
       joinedAt: now,
       connected: false,
       lastSeenAt: now,
-      inputSeq: 0,
-      totalTaps: 0,
-      pendingTaps: 0,
       distance: 0,
       rank: this.players.size + 1,
-      status: "connected"
+      status: "connected",
+      questionCursor: 0,
+      questionSeed: this.players.size,
+      correctAnswers: 0,
+      wrongAnswers: 0,
+      effectCount: 0,
+      distanceGained: 0,
+      distanceLost: 0,
+      lockoutUntil: null,
+      pendingRewardChoice: false,
+      recentOutcome: null
     };
 
     this.players.set(player.playerId, player);
+    syncRanks([...this.players.values()]);
     await this.persistState(true);
     this.broadcastRoster();
 
@@ -380,6 +404,7 @@ export class GameSessionDurableObject extends DurableObject<Env> {
         serverTimeMs: Date.now(),
         summary: this.getSummary()
       });
+      this.broadcastSnapshot(true);
     } else if (playerId) {
       const sockets = this.playerSockets.get(playerId) ?? new Set<WebSocket>();
       sockets.add(server);
@@ -401,6 +426,11 @@ export class GameSessionDurableObject extends DurableObject<Env> {
         serverTimeMs: Date.now(),
         summary: this.getSummary()
       });
+
+      if (player) {
+        this.send(server, this.buildPlayerState(player));
+      }
+
       this.broadcastRoster();
       this.broadcastSnapshot(true);
     }
@@ -431,7 +461,69 @@ export class GameSessionDurableObject extends DurableObject<Env> {
       phase: "countdown",
       countdownMs: this.config.countdownMs
     });
+    this.broadcastPlayerStates();
     this.scheduleLoop();
+  }
+
+  private async handlePlayerAnswer(player: SessionPlayer, questionId: string, answerId: string): Promise<void> {
+    const now = Date.now();
+    clearExpiredLockout(player, now);
+
+    if (this.phase !== "live" || player.pendingRewardChoice || isLockoutActive(player, now)) {
+      return;
+    }
+
+    const isCorrect = evaluateAnswer(player, questionId, answerId);
+    if (isCorrect) {
+      player.correctAnswers += 1;
+      player.pendingRewardChoice = true;
+      player.recentOutcome = {
+        kind: "correct",
+        title: "Correct",
+        detail: "Choose your reward: safe progress or a chaotic chest.",
+        at: now
+      };
+    } else {
+      player.wrongAnswers += 1;
+      player.lockoutUntil = now + this.config.lockoutMs;
+      player.questionCursor += 1;
+      player.recentOutcome = {
+        kind: "wrong",
+        title: "Locked out",
+        detail: `Wrong answer. You're frozen for ${Math.ceil(this.config.lockoutMs / 1000)}s.`,
+        at: now
+      };
+    }
+
+    syncRanks([...this.players.values()]);
+    this.broadcastSnapshot(true);
+    this.broadcastPlayerStates();
+    await this.persistState(false);
+  }
+
+  private async handleRewardChoice(player: SessionPlayer, choice: "move" | "effect"): Promise<void> {
+    const now = Date.now();
+    clearExpiredLockout(player, now);
+
+    if (this.phase !== "live" || !player.pendingRewardChoice) {
+      return;
+    }
+
+    const resolution = applyRewardChoice(
+      [...this.players.values()],
+      player,
+      choice,
+      `${this.sessionId}:${player.playerId}:${player.questionCursor}:${this.tick}`
+    );
+
+    player.pendingRewardChoice = false;
+    player.questionCursor += 1;
+    player.recentOutcome = resolution.outcome;
+
+    syncRanks([...this.players.values()]);
+    this.broadcastSnapshot(true);
+    this.broadcastPlayerStates();
+    await this.persistState(false);
   }
 
   private async finishMatch(): Promise<void> {
@@ -442,15 +534,23 @@ export class GameSessionDurableObject extends DurableObject<Env> {
     this.phase = "finished";
     this.endedAt = Date.now();
 
+    for (const player of this.players.values()) {
+      player.pendingRewardChoice = false;
+      player.lockoutUntil = null;
+      player.status = "finished";
+    }
+
     const standings = buildStandings([...this.players.values()]);
     const winners = standings.slice(0, 3).map((standing) => standing.playerId);
-    const totalTaps = standings.reduce((sum, standing) => sum + standing.totalTaps, 0);
+    const totalCorrectAnswers = standings.reduce((sum, standing) => sum + standing.correctAnswers, 0);
+    const totalWrongAnswers = standings.reduce((sum, standing) => sum + standing.wrongAnswers, 0);
+    const totalEffectsTriggered = standings.reduce((sum, standing) => sum + standing.effectsTriggered, 0);
 
     this.lastResult = {
       matchId: createId("match"),
       sessionId: this.sessionId,
       code: this.code,
-      gameType: "tapdash",
+      gameType: "quizdash",
       startedAt: this.startedAt ?? this.createdAt,
       endedAt: this.endedAt,
       durationMs: (this.startedAt ? this.endedAt - this.startedAt : 0) || 0,
@@ -458,13 +558,13 @@ export class GameSessionDurableObject extends DurableObject<Env> {
       winners,
       standings,
       stats: {
-        totalTaps,
-        averageTapsPerPlayer: standings.length === 0 ? 0 : Math.round((totalTaps / standings.length) * 100) / 100,
+        totalCorrectAnswers,
+        totalWrongAnswers,
+        totalEffectsTriggered,
         winningDistance: standings[0]?.distance ?? 0
       }
     };
 
-    await persistMatchResult(this.env.DB, this.lastResult);
     await this.persistState(true);
     await this.schedulePhaseAlarm();
 
@@ -481,6 +581,18 @@ export class GameSessionDurableObject extends DurableObject<Env> {
       winners: this.lastResult.winners,
       standings: this.lastResult.standings
     });
+    this.broadcastPlayerStates();
+
+    try {
+      await persistMatchResult(this.env.DB, this.lastResult);
+    } catch (error) {
+      console.error("Failed to persist match result", {
+        sessionId: this.sessionId,
+        code: this.code,
+        matchId: this.lastResult.matchId,
+        error
+      });
+    }
   }
 
   private scheduleLoop(): void {
@@ -502,6 +614,14 @@ export class GameSessionDurableObject extends DurableObject<Env> {
   private async runTick(): Promise<void> {
     this.tick += 1;
     const now = Date.now();
+    let lockoutChanged = false;
+
+    for (const player of this.players.values()) {
+      if (player.lockoutUntil !== null && player.lockoutUntil <= now) {
+        clearExpiredLockout(player, now);
+        lockoutChanged = true;
+      }
+    }
 
     if (this.phase === "countdown" && this.countdownEndsAt && now >= this.countdownEndsAt) {
       this.phase = "live";
@@ -515,14 +635,16 @@ export class GameSessionDurableObject extends DurableObject<Env> {
         phase: "live",
         remainingMs: this.config.raceDurationMs
       });
+      this.broadcastPlayerStates();
     }
 
     if (this.phase === "live") {
-      stepRace([...this.players.values()]);
-
       if (this.liveEndsAt && now >= this.liveEndsAt) {
         await this.finishMatch();
       } else {
+        if (lockoutChanged) {
+          this.broadcastPlayerStates();
+        }
         this.broadcastSnapshot();
       }
     } else if (this.phase === "countdown") {
@@ -536,6 +658,41 @@ export class GameSessionDurableObject extends DurableObject<Env> {
 
     if (now - this.lastPersistedAt > 1_000) {
       await this.persistState(false);
+    }
+  }
+
+  private buildPlayerState(player: SessionPlayer): PlayerStateEvent {
+    const now = Date.now();
+    clearExpiredLockout(player, now);
+
+    return {
+      v: PROTOCOL_VERSION,
+      type: "player_state",
+      phase: this.phase,
+      playerId: player.playerId,
+      distance: Math.round(player.distance * 100) / 100,
+      rank: player.rank,
+      correctAnswers: player.correctAnswers,
+      wrongAnswers: player.wrongAnswers,
+      effectsTriggered: player.effectCount,
+      lockoutEndsAt: player.lockoutUntil && player.lockoutUntil > now ? player.lockoutUntil : null,
+      pendingRewardChoice: player.pendingRewardChoice,
+      currentQuestion: this.phase === "live" && !player.pendingRewardChoice ? getQuestionForPlayer(player) : null,
+      recentOutcome: player.recentOutcome
+    };
+  }
+
+  private broadcastPlayerStates(): void {
+    for (const [playerId, sockets] of this.playerSockets.entries()) {
+      const player = this.players.get(playerId);
+      if (!player) {
+        continue;
+      }
+
+      const event = this.buildPlayerState(player);
+      for (const socket of sockets) {
+        this.send(socket, event);
+      }
     }
   }
 
@@ -556,7 +713,8 @@ export class GameSessionDurableObject extends DurableObject<Env> {
         avatarId: player.avatarId,
         d: Math.round(player.distance * 100) / 100,
         r: player.rank,
-        t: player.totalTaps,
+        correctAnswers: player.correctAnswers,
+        wrongAnswers: player.wrongAnswers,
         status: player.status
       }));
 
@@ -569,7 +727,9 @@ export class GameSessionDurableObject extends DurableObject<Env> {
       remainingMs:
         this.phase === "countdown"
           ? Math.max(0, (this.countdownEndsAt ?? now) - now)
-          : Math.max(0, (this.liveEndsAt ?? now) - now),
+          : this.phase === "live"
+            ? Math.max(0, (this.liveEndsAt ?? now) - now)
+            : 0,
       players
     });
   }

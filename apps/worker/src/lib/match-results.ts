@@ -49,7 +49,7 @@ export async function readMatchResult(database: D1Database, matchId: string): Pr
     matchId: String(row.match_id),
     sessionId: String(row.session_id),
     code: String(row.code),
-    gameType: "tapdash",
+    gameType: "quizdash",
     startedAt: Number(row.started_at),
     endedAt: Number(row.ended_at),
     durationMs: Number(row.duration_ms),

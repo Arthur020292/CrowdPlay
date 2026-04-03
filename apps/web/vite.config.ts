@@ -9,6 +9,12 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react(), tailwindcss()],
+    resolve: {
+      alias: {
+        "@crowdplay/protocol": new URL("../../packages/protocol/src/index.ts", import.meta.url).pathname,
+        "@crowdplay/game-quizdash": new URL("../../packages/game-quizdash/src/index.ts", import.meta.url).pathname
+      }
+    },
     server: {
       host: "0.0.0.0",
       port,

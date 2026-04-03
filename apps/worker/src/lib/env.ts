@@ -19,12 +19,13 @@ export interface PersistedSessionState {
   liveEndsAt: number | null;
   tick: number;
   config: {
-    gameType: "tapdash";
+    gameType: "quizdash";
     playerLimit: number;
     raceDurationMs: number;
     countdownMs: number;
     tickRateHz: number;
     snapshotRateHz: number;
+    lockoutMs: number;
   };
   players: Array<{
     playerId: string;
@@ -33,11 +34,25 @@ export interface PersistedSessionState {
     joinedAt: number;
     connected: boolean;
     lastSeenAt: number;
-    inputSeq: number;
-    totalTaps: number;
-    pendingTaps: number;
     distance: number;
     rank: number;
+    questionCursor: number;
+    questionSeed: number;
+    correctAnswers: number;
+    wrongAnswers: number;
+    effectCount: number;
+    distanceGained: number;
+    distanceLost: number;
+    lockoutUntil: number | null;
+    pendingRewardChoice: boolean;
+    recentOutcome: {
+      kind: "correct" | "wrong" | "reward";
+      title: string;
+      detail: string;
+      effectType?: "move" | "swap" | "steal" | "trap";
+      distanceDelta?: number;
+      at: number;
+    } | null;
     status: "connected" | "disconnected" | "finished" | "kicked";
   }>;
   lastResult: MatchResult | null;

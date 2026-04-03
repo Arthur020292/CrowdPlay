@@ -39,7 +39,7 @@ export function PlayerIdentityPanel({
     <div className="cp-card-light mx-auto max-w-xl p-8 sm:p-10">
       <span className="cp-eyebrow cp-eyebrow-light">Session {code}</span>
       <h1 className="mt-5 text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">{isNameStep ? "Pick your name" : "Choose your avatar"}</h1>
-      {isNameStep ? null : <p className="mt-3 text-base text-slate-600 sm:text-lg">Now pick the avatar that will represent you in the race.</p>}
+      {isNameStep ? null : <p className="mt-3 text-base text-slate-600 sm:text-lg">Now pick the avatar that will represent you in the quiz chaos.</p>}
 
       {isNameStep ? (
         <form

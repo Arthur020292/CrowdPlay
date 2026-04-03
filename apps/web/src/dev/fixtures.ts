@@ -1,9 +1,12 @@
+import { QUESTION_BANK } from "@crowdplay/game-quizdash";
 import {
   PLAYER_AVATAR_PRESETS,
   type MatchFinishedEvent,
   type MatchResult,
   type MatchStanding,
   type PlayerAvatarId,
+  type PlayerOutcome,
+  type PlayerStateEvent,
   type RosterPlayer,
   type SnapshotEvent,
   type SnapshotPlayer,
@@ -28,38 +31,10 @@ const playerSeeds: PlayerSeed[] = [
 ];
 
 const crowdedPlayerNames = [
-  "Ava",
-  "Liam",
-  "Mia",
-  "Noah",
-  "Zoe",
-  "Leo",
-  "Emma",
-  "Mason",
-  "Chloe",
-  "Lucas",
-  "Nora",
-  "Ethan",
-  "Ivy",
-  "Logan",
-  "Ruby",
-  "Owen",
-  "Ella",
-  "Aiden",
-  "Luna",
-  "Elijah",
-  "Maya",
-  "James",
-  "Aria",
-  "Benjamin",
-  "Sage",
-  "Henry",
-  "Skye",
-  "Jack",
-  "Hazel",
-  "Alexander",
-  "Nova",
-  "Daniel"
+  "Ava", "Liam", "Mia", "Noah", "Zoe", "Leo", "Emma", "Mason",
+  "Chloe", "Lucas", "Nora", "Ethan", "Ivy", "Logan", "Ruby", "Owen",
+  "Ella", "Aiden", "Luna", "Elijah", "Maya", "James", "Aria", "Benjamin",
+  "Sage", "Henry", "Skye", "Jack", "Hazel", "Alexander", "Nova", "Daniel"
 ] as const;
 
 const crowdedPlayerSeeds: PlayerSeed[] = crowdedPlayerNames.map((name, index) => ({
@@ -85,14 +60,22 @@ function makeRosterPlayer(seed: PlayerSeed, index: number, overrides: Partial<Ro
   };
 }
 
-function makeSnapshotPlayer(seed: PlayerSeed, index: number, distance: number, taps: number, overrides: Partial<SnapshotPlayer> = {}): SnapshotPlayer {
+function makeSnapshotPlayer(
+  seed: PlayerSeed,
+  index: number,
+  distance: number,
+  correctAnswers: number,
+  wrongAnswers: number,
+  overrides: Partial<SnapshotPlayer> = {}
+): SnapshotPlayer {
   return {
     id: seed.id,
     name: seed.name,
     avatarId: seed.avatarId,
     d: distance,
     r: index + 1,
-    t: taps,
+    correctAnswers,
+    wrongAnswers,
     status: "connected",
     ...overrides
   };
@@ -105,8 +88,43 @@ function toStandings(players: SnapshotPlayer[]): MatchStanding[] {
     avatarId: player.avatarId,
     rank: index + 1,
     distance: player.d,
-    totalTaps: player.t
+    correctAnswers: player.correctAnswers,
+    wrongAnswers: player.wrongAnswers,
+    effectsTriggered: Math.max(1, Math.floor(player.correctAnswers / 2))
   }));
+}
+
+function makeOutcome(partial: Omit<PlayerOutcome, "at">): PlayerOutcome {
+  return {
+    ...partial,
+    at: FIXTURE_TIME
+  };
+}
+
+function makePlayerState(seed: PlayerSeed, partial: Partial<PlayerStateEvent>): PlayerStateEvent {
+  return {
+    v: PROTOCOL_VERSION,
+    type: "player_state",
+    phase: "live",
+    playerId: seed.id,
+    distance: 82,
+    rank: 3,
+    correctAnswers: 5,
+    wrongAnswers: 1,
+    effectsTriggered: 2,
+    lockoutEndsAt: null,
+    pendingRewardChoice: false,
+    currentQuestion: QUESTION_BANK[0]
+      ? {
+          id: QUESTION_BANK[0].id,
+          prompt: QUESTION_BANK[0].prompt,
+          format: QUESTION_BANK[0].format,
+          options: QUESTION_BANK[0].options
+        }
+      : null,
+    recentOutcome: null,
+    ...partial
+  };
 }
 
 export const previewRoster: RosterPlayer[] = [
@@ -119,9 +137,7 @@ export const previewRoster: RosterPlayer[] = [
 ];
 
 export const previewCrowdedRoster: RosterPlayer[] = crowdedPlayerSeeds.map((seed, index) =>
-  makeRosterPlayer(seed, index, {
-    connected: index % 9 !== 0
-  })
+  makeRosterPlayer(seed, index, { connected: index % 9 !== 0 })
 );
 
 export const previewCountdownSnapshot: SnapshotEvent = {
@@ -132,12 +148,12 @@ export const previewCountdownSnapshot: SnapshotEvent = {
   serverTimeMs: FIXTURE_TIME,
   remainingMs: 2_100,
   players: [
-    makeSnapshotPlayer(playerSeeds[0], 0, 0, 0),
-    makeSnapshotPlayer(playerSeeds[1], 1, 0, 0),
-    makeSnapshotPlayer(playerSeeds[2], 2, 0, 0),
-    makeSnapshotPlayer(playerSeeds[3], 3, 0, 0),
-    makeSnapshotPlayer(playerSeeds[4], 4, 0, 0, { status: "disconnected" }),
-    makeSnapshotPlayer(playerSeeds[5], 5, 0, 0)
+    makeSnapshotPlayer(playerSeeds[0], 0, 0, 0, 0),
+    makeSnapshotPlayer(playerSeeds[1], 1, 0, 0, 0),
+    makeSnapshotPlayer(playerSeeds[2], 2, 0, 0, 0),
+    makeSnapshotPlayer(playerSeeds[3], 3, 0, 0, 0),
+    makeSnapshotPlayer(playerSeeds[4], 4, 0, 0, 0, { status: "disconnected" }),
+    makeSnapshotPlayer(playerSeeds[5], 5, 0, 0, 0)
   ]
 };
 
@@ -149,12 +165,12 @@ export const previewLivePreviousSnapshot: SnapshotEvent = {
   serverTimeMs: FIXTURE_TIME - 80,
   remainingMs: 48_000,
   players: [
-    makeSnapshotPlayer(playerSeeds[1], 0, 94.8, 152),
-    makeSnapshotPlayer(playerSeeds[0], 1, 93.6, 149),
-    makeSnapshotPlayer(playerSeeds[5], 2, 92.7, 147),
-    makeSnapshotPlayer(playerSeeds[2], 3, 88.9, 141),
-    makeSnapshotPlayer(playerSeeds[3], 4, 84.1, 133),
-    makeSnapshotPlayer(playerSeeds[4], 5, 79.4, 128, { status: "disconnected" })
+    makeSnapshotPlayer(playerSeeds[1], 0, 96.4, 8, 1),
+    makeSnapshotPlayer(playerSeeds[0], 1, 94.1, 7, 1),
+    makeSnapshotPlayer(playerSeeds[5], 2, 92.7, 7, 2),
+    makeSnapshotPlayer(playerSeeds[2], 3, 90.2, 6, 2),
+    makeSnapshotPlayer(playerSeeds[3], 4, 86.4, 6, 3),
+    makeSnapshotPlayer(playerSeeds[4], 5, 78.1, 4, 4, { status: "disconnected" })
   ]
 };
 
@@ -164,12 +180,12 @@ export const previewLiveSnapshot: SnapshotEvent = {
   serverTimeMs: FIXTURE_TIME,
   remainingMs: 47_920,
   players: [
-    makeSnapshotPlayer(playerSeeds[1], 0, 96.1, 155),
-    makeSnapshotPlayer(playerSeeds[0], 1, 95.7, 154),
-    makeSnapshotPlayer(playerSeeds[5], 2, 94.2, 150),
-    makeSnapshotPlayer(playerSeeds[2], 3, 90.4, 145),
-    makeSnapshotPlayer(playerSeeds[3], 4, 85.3, 136),
-    makeSnapshotPlayer(playerSeeds[4], 5, 80.1, 129, { status: "disconnected" })
+    makeSnapshotPlayer(playerSeeds[1], 0, 98.8, 9, 1),
+    makeSnapshotPlayer(playerSeeds[0], 1, 96.7, 8, 1),
+    makeSnapshotPlayer(playerSeeds[5], 2, 95.4, 8, 2),
+    makeSnapshotPlayer(playerSeeds[2], 3, 92.9, 7, 2),
+    makeSnapshotPlayer(playerSeeds[3], 4, 87.8, 6, 3),
+    makeSnapshotPlayer(playerSeeds[4], 5, 81.1, 5, 4, { status: "disconnected" })
   ]
 };
 
@@ -185,7 +201,8 @@ export const previewLiveCrowdedPreviousSnapshot: SnapshotEvent = {
       crowdedPlayerSeeds[seedIndex],
       index,
       Math.max(18, 126 - index * 2.35 + (index % 4) * 0.4),
-      Math.max(24, 182 - index * 3 + (index % 5)),
+      Math.max(3, 14 - Math.floor(index / 3)),
+      Math.max(0, Math.floor(index / 5)),
       index % 9 === 0 ? { status: "disconnected" } : {}
     )
   )
@@ -201,7 +218,8 @@ export const previewLiveCrowdedSnapshot: SnapshotEvent = {
       crowdedPlayerSeeds[seedIndex],
       index,
       Math.max(20, 128 - index * 2.3 + (index % 4) * 0.45),
-      Math.max(26, 185 - index * 3 + (index % 5)),
+      Math.max(4, 15 - Math.floor(index / 3)),
+      Math.max(0, Math.floor(index / 5)),
       index % 9 === 0 ? { status: "disconnected" } : {}
     )
   )
@@ -215,14 +233,90 @@ export const previewSprintSnapshot: SnapshotEvent = {
   serverTimeMs: FIXTURE_TIME,
   remainingMs: 6_400,
   players: [
-    makeSnapshotPlayer(playerSeeds[0], 0, 142.4, 232),
-    makeSnapshotPlayer(playerSeeds[1], 1, 141.8, 230),
-    makeSnapshotPlayer(playerSeeds[2], 2, 139.1, 222),
-    makeSnapshotPlayer(playerSeeds[5], 3, 137.5, 218),
-    makeSnapshotPlayer(playerSeeds[3], 4, 133.7, 209),
-    makeSnapshotPlayer(playerSeeds[4], 5, 127.2, 201)
+    makeSnapshotPlayer(playerSeeds[0], 0, 142.4, 12, 2),
+    makeSnapshotPlayer(playerSeeds[1], 1, 141.8, 12, 2),
+    makeSnapshotPlayer(playerSeeds[2], 2, 139.1, 11, 3),
+    makeSnapshotPlayer(playerSeeds[5], 3, 137.5, 11, 3),
+    makeSnapshotPlayer(playerSeeds[3], 4, 133.7, 10, 4),
+    makeSnapshotPlayer(playerSeeds[4], 5, 127.2, 9, 5)
   ]
 };
+
+export const previewPlayerQuestionState = makePlayerState(playerSeeds[0], {
+  distance: 96.7,
+  rank: 2,
+  correctAnswers: 8,
+  wrongAnswers: 1,
+  effectsTriggered: 2,
+  currentQuestion: QUESTION_BANK[2]
+    ? {
+        id: QUESTION_BANK[2].id,
+        prompt: QUESTION_BANK[2].prompt,
+        format: QUESTION_BANK[2].format,
+        options: QUESTION_BANK[2].options
+      }
+    : null
+});
+
+export const previewPlayerRewardState = makePlayerState(playerSeeds[0], {
+  distance: 102.7,
+  rank: 2,
+  correctAnswers: 9,
+  wrongAnswers: 1,
+  effectsTriggered: 2,
+  pendingRewardChoice: true,
+  currentQuestion: null,
+  recentOutcome: makeOutcome({
+    kind: "correct",
+    title: "Correct",
+    detail: "Choose your reward: safe progress or a chaotic chest."
+  })
+});
+
+export const previewPlayerLockoutState = makePlayerState(playerSeeds[0], {
+  distance: 102.7,
+  rank: 2,
+  correctAnswers: 9,
+  wrongAnswers: 2,
+  effectsTriggered: 2,
+  lockoutEndsAt: FIXTURE_TIME + 3_500,
+  currentQuestion: QUESTION_BANK[3]
+    ? {
+        id: QUESTION_BANK[3].id,
+        prompt: QUESTION_BANK[3].prompt,
+        format: QUESTION_BANK[3].format,
+        options: QUESTION_BANK[3].options
+      }
+    : null,
+  recentOutcome: makeOutcome({
+    kind: "wrong",
+    title: "Locked out",
+    detail: "Wrong answer. You're frozen for 4s."
+  })
+});
+
+export const previewPlayerEffectState = makePlayerState(playerSeeds[0], {
+  distance: 116.7,
+  rank: 1,
+  correctAnswers: 10,
+  wrongAnswers: 2,
+  effectsTriggered: 3,
+  currentQuestion: QUESTION_BANK[5]
+    ? {
+        id: QUESTION_BANK[5].id,
+        prompt: QUESTION_BANK[5].prompt,
+        format: QUESTION_BANK[5].format,
+        options: QUESTION_BANK[5].options
+      }
+    : null,
+  recentOutcome: makeOutcome({
+    kind: "reward",
+    title: "Heist chest",
+    detail: "You stole 8.0m from Liam.",
+    effectType: "steal",
+    distanceDelta: 8
+  })
+});
 
 export const previewFinishedEvent: MatchFinishedEvent = {
   v: PROTOCOL_VERSION,
@@ -244,7 +338,7 @@ export const previewMatchResult: MatchResult = {
   matchId: "match_preview_001",
   sessionId: "session_preview_001",
   code: "DEMO5",
-  gameType: "tapdash",
+  gameType: "quizdash",
   startedAt: FIXTURE_TIME - 120_000,
   endedAt: FIXTURE_TIME,
   durationMs: 120_000,
@@ -252,8 +346,9 @@ export const previewMatchResult: MatchResult = {
   winners: previewFinishedEvent.winners,
   standings: previewFinishedEvent.standings,
   stats: {
-    totalTaps: previewFinishedEvent.standings.reduce((total, standing) => total + standing.totalTaps, 0),
-    averageTapsPerPlayer: previewFinishedEvent.standings.reduce((total, standing) => total + standing.totalTaps, 0) / previewFinishedEvent.standings.length,
+    totalCorrectAnswers: previewFinishedEvent.standings.reduce((total, standing) => total + standing.correctAnswers, 0),
+    totalWrongAnswers: previewFinishedEvent.standings.reduce((total, standing) => total + standing.wrongAnswers, 0),
+    totalEffectsTriggered: previewFinishedEvent.standings.reduce((total, standing) => total + standing.effectsTriggered, 0),
     winningDistance: previewFinishedEvent.standings[0]?.distance ?? 0
   }
 };

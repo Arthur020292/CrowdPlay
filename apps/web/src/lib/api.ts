@@ -20,6 +20,7 @@ export async function createSession(input: {
   playerLimit?: number;
   raceDurationMs?: number;
   countdownMs?: number;
+  lockoutMs?: number;
 }): Promise<CreateSessionResponse> {
   const response = await fetch("/api/sessions", {
     method: "POST",

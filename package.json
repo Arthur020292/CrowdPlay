@@ -11,8 +11,8 @@
     "dev": "node ./scripts/dev.mjs",
     "dev:web": "npm run dev -w @crowdplay/web",
     "dev:worker": "npm run dev -w @crowdplay/worker",
-    "build": "npm run build -w @crowdplay/protocol && npm run build -w @crowdplay/game-tapdash && npm run build -w @crowdplay/web && npm run build -w @crowdplay/worker",
-    "test": "npm run test -w @crowdplay/game-tapdash",
-    "typecheck": "npm run typecheck -w @crowdplay/protocol && npm run typecheck -w @crowdplay/game-tapdash && npm run typecheck -w @crowdplay/web && npm run typecheck -w @crowdplay/worker"
+    "build": "npm run build -w @crowdplay/protocol && npm run build -w @crowdplay/game-quizdash && npm run build -w @crowdplay/web && npm run build -w @crowdplay/worker",
+    "test": "npm run test -w @crowdplay/game-quizdash",
+    "typecheck": "npm run typecheck -w @crowdplay/protocol && npm run typecheck -w @crowdplay/game-quizdash && npm run typecheck -w @crowdplay/web && npm run typecheck -w @crowdplay/worker"
   }
 }

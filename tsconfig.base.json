@@ -15,7 +15,7 @@
     "baseUrl": ".",
     "paths": {
       "@crowdplay/protocol": ["packages/protocol/src/index.ts"],
-      "@crowdplay/game-tapdash": ["packages/game-tapdash/src/index.ts"]
+      "@crowdplay/game-quizdash": ["packages/game-quizdash/src/index.ts"]
     }
   }
 }
