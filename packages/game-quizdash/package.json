@@ -10,7 +10,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@crowdplay/game-goldrush": "0.1.0",
+    "@crowdplay/game-content": "0.1.0",
     "@crowdplay/protocol": "0.1.0"
   },
   "devDependencies": {

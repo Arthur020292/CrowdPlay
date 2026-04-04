@@ -12,6 +12,7 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: {
         "@crowdplay/protocol": new URL("../../packages/protocol/src/index.ts", import.meta.url).pathname,
+        "@crowdplay/game-content": new URL("../../packages/game-content/src/index.ts", import.meta.url).pathname,
         "@crowdplay/game-goldrush": new URL("../../packages/game-goldrush/src/index.ts", import.meta.url).pathname,
         "@crowdplay/game-quizdash": new URL("../../packages/game-quizdash/src/index.ts", import.meta.url).pathname
       }

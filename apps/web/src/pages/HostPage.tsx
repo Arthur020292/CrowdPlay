@@ -1,28 +1,25 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
-import { QUESTION_BANK, type QuestionDefinition } from "@crowdplay/game-goldrush";
+import { QUESTION_BANK, type QuestionDefinition } from "@crowdplay/game-content";
 import {
   getDefaultPlayerAvatar,
   safeParseServerEvent,
   type ChaosEvent,
-  type GameType,
   type MatchFinishedEvent,
   type QuizDashSnapshotEvent,
   type RosterPlayer,
   type SnapshotEvent
 } from "@crowdplay/protocol";
 
-import { ChaosFeed } from "../components/ChaosFeed";
 import { HostLobbyStage } from "../components/HostLobbyStage";
-import { HostPodium } from "../components/HostPodium";
-import { Leaderboard } from "../components/Leaderboard";
 import { LobbyRosterGrid } from "../components/LobbyRosterGrid";
-import { RaceCanvas } from "../components/RaceCanvas";
+import { GoldRushHostView } from "../games/goldrush/GoldRushHostView";
+import { QuizDashHostView } from "../games/quizdash/QuizDashHostView";
+import { getGameLabel } from "../games/registry";
 import { useSessionSocket } from "../hooks/useSessionSocket";
 import { buildSessionSocketUrl, endSession, joinSession, startSession } from "../lib/api";
 import { getHostToken, saveHostToken } from "../lib/storage";
-import { formatRemainingLabel } from "../lib/time";
 
 const LOCAL_BOT_BASE_NAMES = [
   "Nova",
@@ -50,6 +47,12 @@ const LOCAL_BOT_BASE_NAMES = [
 interface LocalBotClient {
   socket: WebSocket | null;
   actionTimer: number | null;
+  reactionProfile: {
+    answerBaseMs: number;
+    answerJitterMs: number;
+    pickBaseMs: number;
+    pickJitterMs: number;
+  };
 }
 
 const questionBankById = new Map<string, QuestionDefinition>(QUESTION_BANK.map((question) => [question.id, question]));
@@ -74,18 +77,6 @@ function pickBotAnswer(questionId: string): string {
   return fallbackOption?.id ?? question.correctAnswerId;
 }
 
-function getGameLabel(gameType: GameType | null): string {
-  if (gameType === "goldrush") {
-    return "Gold Rush";
-  }
-
-  if (gameType === "quizdash") {
-    return "QuizDash";
-  }
-
-  return "CrowdPlay";
-}
-
 function isQuizDashSnapshot(snapshot: SnapshotEvent | null): snapshot is QuizDashSnapshotEvent {
   return snapshot?.gameType === "quizdash";
 }
@@ -95,6 +86,21 @@ function clearBotTimer(botClient: LocalBotClient) {
     window.clearTimeout(botClient.actionTimer);
     botClient.actionTimer = null;
   }
+}
+
+function randomBetween(min: number, max: number): number {
+  return min + Math.floor(Math.random() * (max - min + 1));
+}
+
+function getBotReactionProfile(index: number) {
+  const burstGroup = index % 5;
+
+  return {
+    answerBaseMs: 60 + burstGroup * 18,
+    answerJitterMs: 80,
+    pickBaseMs: 45 + burstGroup * 14,
+    pickJitterMs: 60
+  };
 }
 
 export function HostPage() {
@@ -115,7 +121,7 @@ export function HostPage() {
     saveHostToken(code, queryToken);
   }
 
-  const [gameType, setGameType] = useState<GameType | null>(null);
+  const [gameType, setGameType] = useState<SnapshotEvent["gameType"] | MatchFinishedEvent["gameType"] | null>(null);
   const [roster, setRoster] = useState<RosterPlayer[]>([]);
   const [snapshot, setSnapshot] = useState<SnapshotEvent | null>(null);
   const [previousSnapshot, setPreviousSnapshot] = useState<SnapshotEvent | null>(null);
@@ -153,7 +159,7 @@ export function HostPage() {
           setRemainingMs(event.remainingMs);
           break;
         case "chaos_event":
-          setChaosEvents((current) => [event, ...current].slice(0, 8));
+          setChaosEvents((current) => [event, ...current].slice(0, 40));
           break;
         case "match_finished":
           setGameType(event.gameType);
@@ -193,7 +199,11 @@ export function HostPage() {
         for (let index = localBotsRef.current.length; index < targetCount; index += 1) {
           const joined = await joinSession(code, getLocalBotName(index), getDefaultPlayerAvatar(index));
           const socket = new WebSocket(buildSessionSocketUrl(code, joined.playerToken));
-          const botClient: LocalBotClient = { socket, actionTimer: null };
+          const botClient: LocalBotClient = {
+            socket,
+            actionTimer: null,
+            reactionProfile: getBotReactionProfile(index)
+          };
 
           socket.addEventListener("message", (messageEvent) => {
             const payload = JSON.parse(String(messageEvent.data));
@@ -224,7 +234,7 @@ export function HostPage() {
                   type: "target_pick",
                   targetPlayerId: target.playerId
                 }));
-              }, 240 + Math.floor(Math.random() * 360));
+              }, botClient.reactionProfile.pickBaseMs + randomBetween(0, botClient.reactionProfile.pickJitterMs));
               return;
             }
 
@@ -235,7 +245,7 @@ export function HostPage() {
                   type: "chest_pick",
                   chestIndex: Math.floor(Math.random() * 3)
                 }));
-              }, 240 + Math.floor(Math.random() * 360));
+              }, botClient.reactionProfile.pickBaseMs + randomBetween(0, botClient.reactionProfile.pickJitterMs));
               return;
             }
 
@@ -254,7 +264,7 @@ export function HostPage() {
                 questionId: event.currentQuestion!.id,
                 answerId: pickBotAnswer(event.currentQuestion!.id)
               }));
-            }, 500 + Math.floor(Math.random() * 800));
+            }, botClient.reactionProfile.answerBaseMs + randomBetween(0, botClient.reactionProfile.answerJitterMs));
           });
 
           socket.addEventListener("close", () => clearBotTimer(botClient));
@@ -305,134 +315,32 @@ export function HostPage() {
   }
 
   if (currentGameType === "quizdash") {
-    const livePlayers =
-      quizDashSnapshot?.players ??
-      roster
-        .filter((player) => player.gameType === "quizdash")
-        .map((player) => ({
-          gameType: "quizdash" as const,
-          id: player.id,
-          name: player.name,
-          avatarId: player.avatarId,
-          distance: player.distance,
-          rank: player.rank,
-          correctAnswers: 0,
-          wrongAnswers: 0,
-          status: player.connected ? "connected" : "disconnected"
-        }));
-
     return (
-      <div className="cp-page-background cp-page-background--static min-h-screen space-y-6 px-4 py-6 sm:px-6 lg:px-8">
-        <section className="grid gap-6 xl:min-h-[calc(100vh-3rem)] xl:grid-cols-[1.4fr_0.6fr]">
-          <div className="flex min-h-0 flex-col">
-            {result?.gameType === "quizdash" ? (
-              <HostPodium
-                standings={result.standings}
-                action={
-                  <button
-                    onClick={() => navigate(`/results/${result.matchId}`)}
-                    className="cp-button-secondary px-4 py-2 text-sm"
-                  >
-                    Open results
-                  </button>
-                }
-              />
-            ) : (
-              <RaceCanvas
-                snapshot={quizDashSnapshot}
-                previousSnapshot={quizDashPreviousSnapshot}
-                className="min-h-[420px] flex-1"
-                lanePlayerIds={roster.map((player) => player.id)}
-              />
-            )}
-
-            {error ? <p className="mt-4 text-sm text-rose-600">{error}</p> : null}
-          </div>
-
-          <Leaderboard
-            players={result?.gameType === "quizdash" ? result.standings : livePlayers}
-            title={phase === "finished" ? "Final standings" : "Live standings"}
-            scrollable={phase === "live" || phase === "finished"}
-            headerActions={
-              phase === "live" ? (
-                <>
-                  <div className="rounded-full border border-slate-200 bg-white/[0.84] px-4 py-2 text-sm font-medium text-slate-600">
-                    Remaining {formatRemainingLabel(phase, remainingMs)}
-                  </div>
-                  <button
-                    onClick={() => endSession(code, hostToken).catch((endError) => setError(endError instanceof Error ? endError.message : "Unable to end match."))}
-                    disabled={phase !== "live" && phase !== "countdown"}
-                    className="cp-button-secondary px-5 py-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    Stop
-                  </button>
-                </>
-              ) : null
-            }
-          />
-        </section>
-      </div>
+      <QuizDashHostView
+        result={result?.gameType === "quizdash" ? result : null}
+        snapshot={quizDashSnapshot}
+        previousSnapshot={quizDashPreviousSnapshot}
+        roster={roster}
+        phase={phase}
+        remainingMs={remainingMs}
+        error={error}
+        onOpenResults={(matchId) => navigate(`/results/${matchId}`)}
+        onEnd={() => endSession(code, hostToken).catch((endError) => setError(endError instanceof Error ? endError.message : "Unable to end match."))}
+      />
     );
   }
 
-  const goldPlayers =
-    goldRushSnapshot?.players ??
-    roster
-      .filter((player) => player.gameType === "goldrush")
-      .map((player) => ({
-        gameType: "goldrush" as const,
-        id: player.id,
-        name: player.name,
-        avatarId: player.avatarId,
-        gold: player.gold,
-        rank: player.rank,
-        correctAnswers: 0,
-        wrongAnswers: 0,
-        status: player.connected ? "connected" : "disconnected"
-      }));
-
   return (
-    <div className="cp-page-background cp-page-background--static min-h-screen space-y-6 px-4 py-6 sm:px-6 lg:px-8">
-      <section className="grid gap-6 xl:min-h-[calc(100vh-3rem)] xl:grid-cols-[1.15fr_0.85fr]">
-        <div className="flex min-h-0 flex-col gap-6">
-          {result?.gameType === "goldrush" ? (
-            <HostPodium
-              standings={result.standings}
-              action={
-                <button
-                  onClick={() => navigate(`/results/${result.matchId}`)}
-                  className="cp-button-secondary px-4 py-2 text-sm"
-                >
-                  Open results
-                </button>
-              }
-            />
-          ) : null}
-
-          <ChaosFeed events={chaosEvents} className="flex-1" headerBadge={`Remaining ${formatRemainingLabel(phase, remainingMs)}`} />
-
-          {error ? <p className="text-sm text-rose-600">{error}</p> : null}
-        </div>
-
-        <Leaderboard
-          players={result?.gameType === "goldrush" ? result.standings : goldPlayers}
-          title={phase === "finished" ? "Final standings" : "Live standings"}
-          scrollable={phase === "live" || phase === "finished"}
-          showSecondaryText={phase === "finished"}
-          showMetricRank={phase === "finished"}
-          headerActions={
-            phase === "live" ? (
-              <button
-                onClick={() => endSession(code, hostToken).catch((endError) => setError(endError instanceof Error ? endError.message : "Unable to end match."))}
-                disabled={phase !== "live" && phase !== "countdown"}
-                className="cp-button-secondary px-5 py-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                Stop
-              </button>
-            ) : null
-          }
-        />
-      </section>
-    </div>
+    <GoldRushHostView
+      result={result?.gameType === "goldrush" ? result : null}
+      snapshot={goldRushSnapshot}
+      roster={roster}
+      phase={phase}
+      remainingMs={remainingMs}
+      chaosEvents={chaosEvents}
+      error={error}
+      onOpenResults={(matchId) => navigate(`/results/${matchId}`)}
+      onEnd={() => endSession(code, hostToken).catch((endError) => setError(endError instanceof Error ? endError.message : "Unable to end match."))}
+    />
   );
 }

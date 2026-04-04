@@ -1,4 +1,4 @@
-import { QUESTION_BANK } from "@crowdplay/game-goldrush";
+import { QUESTION_BANK } from "@crowdplay/game-content";
 import {
   PLAYER_AVATAR_PRESETS,
   PROTOCOL_VERSION,

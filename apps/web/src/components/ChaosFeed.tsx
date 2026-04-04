@@ -39,7 +39,7 @@ function summarizeEvent(event: ChaosEvent): string {
 
 export function ChaosFeed({ events, className = "", headerBadge }: ChaosFeedProps) {
   return (
-    <section className={`cp-card-panel p-5 ${className}`.trim()}>
+    <section className={`cp-card-panel flex min-h-0 flex-col overflow-hidden p-5 ${className}`.trim()}>
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-2xl font-black text-slate-950">Latest chest swings</h2>
         {headerBadge ? (
@@ -49,7 +49,7 @@ export function ChaosFeed({ events, className = "", headerBadge }: ChaosFeedProp
         ) : null}
       </div>
 
-      <div className="mt-4 space-y-2">
+      <div className="mt-4 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
         {events.length ? (
           events.map((event) => (
             <div key={`${event.actor.playerId}:${event.at}`} className="rounded-[1.1rem] border border-slate-200 bg-white/[0.9] px-3 py-2.5 shadow-[0_6px_16px_rgba(148,163,184,0.08)]">

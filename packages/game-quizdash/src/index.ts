@@ -1,4 +1,4 @@
-import { QUESTION_BANK, type QuestionDefinition } from "../../game-goldrush/src/index";
+import { QUESTION_BANK, type QuestionDefinition } from "../../game-content/src/index";
 import type {
   PendingQuizDashChestOutcome,
   PlayerOutcome,
@@ -8,7 +8,7 @@ import type {
   TargetCandidate
 } from "@crowdplay/protocol";
 
-export { QUESTION_BANK, type QuestionDefinition } from "../../game-goldrush/src/index";
+export { QUESTION_BANK, type QuestionDefinition } from "../../game-content/src/index";
 
 export interface ChestResolution {
   effectType: PendingQuizDashChestOutcome["effectType"];

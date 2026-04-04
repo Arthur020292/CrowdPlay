@@ -13,32 +13,13 @@ import {
 } from "@crowdplay/protocol";
 
 import { AvatarBadge } from "../components/AvatarBadge";
+import { GoldRushPlayerView } from "../games/goldrush/GoldRushPlayerView";
+import { QuizDashPlayerView } from "../games/quizdash/QuizDashPlayerView";
+import { QuestionChestStage } from "../games/shared/QuestionChestStage";
 import { PlayerIdentityPanel } from "../components/PlayerIdentityPanel";
 import { useSessionSocket } from "../hooks/useSessionSocket";
 import { buildSessionSocketUrl, joinSession } from "../lib/api";
 import { getPlayerSession, savePlayerSession } from "../lib/storage";
-
-function formatLockoutLabel(remainingMs: number): string {
-  return `${Math.max(1, Math.ceil(remainingMs / 1000))}s`;
-}
-
-function WaitingPanel({
-  eyebrow,
-  title,
-  detail
-}: {
-  eyebrow: string;
-  title: string;
-  detail: string;
-}) {
-  return (
-    <div className="mt-6 rounded-[1.75rem] border border-white/10 bg-white/[0.06] p-6 text-left">
-      <div className="text-xs font-black uppercase tracking-[0.3em] text-slate-400">{eyebrow}</div>
-      <h2 className="mt-3 text-2xl font-black text-white">{title}</h2>
-      <p className="mt-3 text-sm leading-6 text-slate-300">{detail}</p>
-    </div>
-  );
-}
 
 export function PlayPage() {
   const params = useParams();
@@ -107,7 +88,6 @@ export function PlayPage() {
 
   const goldRushPlayerState = playerState?.gameType === "goldrush" ? playerState : null;
   const quizDashPlayerState = playerState?.gameType === "quizdash" ? playerState : null;
-  const supportsChestFlow = goldRushPlayerState ?? quizDashPlayerState;
 
   useEffect(() => {
     if (!goldRushPlayerState?.lockoutEndsAt) {
@@ -243,107 +223,45 @@ export function PlayPage() {
             <h1 className="text-4xl font-black text-white">{name || "Player"}</h1>
           </div>
 
-          {recentOutcome ? (
-            <div className="mt-6 rounded-[1.5rem] border border-cyan-300/20 bg-cyan-400/10 px-5 py-4 text-left">
-              <div className="text-xs font-black uppercase tracking-[0.3em] text-cyan-200">{recentOutcome.title}</div>
-              <div className="mt-2 text-sm text-slate-200">{recentOutcome.detail}</div>
-            </div>
-          ) : null}
-
-          {phase === "lobby" || phase === "countdown" ? (
-            <WaitingPanel
-              eyebrow={phase === "countdown" ? "Get ready" : "Waiting room"}
-              title={phase === "countdown" ? "Your first question unlocks when the countdown ends." : "The host is waiting to start the match."}
-              detail="Stay on this screen. The game will push your next prompt automatically."
+        {recentOutcome ? (
+          <div className="mt-6 rounded-[1.5rem] border border-cyan-300/20 bg-cyan-400/10 px-5 py-4 text-left">
+            <div className="text-xs font-black uppercase tracking-[0.3em] text-cyan-200">{recentOutcome.title}</div>
+            <div className="mt-2 text-sm text-slate-200">{recentOutcome.detail}</div>
+          </div>
+        ) : null}
+          {goldRushPlayerState ? (
+            <GoldRushPlayerView
+              phase={phase}
+              playerState={goldRushPlayerState}
+              actionPending={actionPending}
+              lockoutRemainingMs={lockoutRemainingMs}
+              onAnswer={handleAnswer}
+              onChestPick={handleChestPick}
+              onTargetPick={handleTargetPick}
             />
-          ) : phase === "finished" ? (
-            <WaitingPanel
-              eyebrow="Match complete"
-              title={currentGameType === "goldrush" ? "The vault race is over." : "The race is finished."}
-              detail="The host screen has the live podium and final standings."
+          ) : quizDashPlayerState ? (
+            <QuizDashPlayerView
+              phase={phase}
+              playerState={quizDashPlayerState}
+              actionPending={actionPending}
+              onAnswer={handleAnswer}
+              onChestPick={handleChestPick}
+              onTargetPick={handleTargetPick}
             />
-          ) : supportsChestFlow?.pendingTargetPick ? (
-            <div className="mt-6 rounded-[1.75rem] border border-white/10 bg-white/[0.06] p-6 text-left">
-              <div className="text-xs font-black uppercase tracking-[0.3em] text-amber-200">Pick a target</div>
-              <h2 className="mt-3 text-2xl font-black text-white">
-                {currentGameType === "goldrush" ? "Choose one of the top vaults." : "Choose one of the top racers."}
-              </h2>
-              <p className="mt-3 text-sm leading-6 text-slate-300">{supportsChestFlow.recentOutcome?.detail ?? "Select who takes the hit."}</p>
-              <div className="mt-6 grid gap-3">
-                {supportsChestFlow.availableTargets.map((target) => (
-                  <button
-                    key={target.playerId}
-                    type="button"
-                    onClick={() => handleTargetPick(target.playerId)}
-                    disabled={actionPending}
-                    className="flex items-center justify-between rounded-[1.4rem] border border-white/12 bg-white/[0.08] px-5 py-4 text-left transition hover:border-amber-300/40 hover:bg-amber-400/10 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    <span className="flex items-center gap-3">
-                      <AvatarBadge avatarId={target.avatarId} size={34} />
-                      <span>
-                        <span className="block text-base font-semibold text-white">{target.name}</span>
-                        <span className="block text-xs uppercase tracking-[0.2em] text-slate-400">Choose target</span>
-                      </span>
-                    </span>
-                    <span className="text-sm font-semibold text-amber-200">Pick</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : supportsChestFlow?.pendingChestPick ? (
-            <div className="mt-6 rounded-[1.75rem] border border-white/10 bg-white/[0.06] p-6 text-left">
-              <div className="text-xs font-black uppercase tracking-[0.3em] text-sky-200">Pick a chest</div>
-              <h2 className="mt-3 text-2xl font-black text-white">Choose 1 of 3 hidden chests.</h2>
-              <p className="mt-3 text-sm leading-6 text-slate-300">
-                {currentGameType === "goldrush"
-                  ? "Every chest can help you cash in or throw the leaderboard into chaos."
-                  : "Every chest can boost your run or scramble the race order."}
-              </p>
-              <div className="mt-6 grid gap-4 md:grid-cols-3">
-                {[0, 1, 2].map((chestIndex) => (
-                  <button
-                    key={chestIndex}
-                    type="button"
-                    onClick={() => handleChestPick(chestIndex as 0 | 1 | 2)}
-                    disabled={actionPending}
-                    className="rounded-[1.8rem] border border-amber-200/60 bg-[linear-gradient(180deg,rgba(254,243,199,0.96),rgba(253,230,138,0.82))] px-5 py-7 text-center text-lg font-black text-amber-950 shadow-[0_18px_30px_rgba(245,158,11,0.18)] transition hover:-translate-y-1 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    Chest {chestIndex + 1}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : lockoutRemainingMs > 0 ? (
-            <WaitingPanel
-              eyebrow="Locked out"
-              title={`Next question unlocks in ${formatLockoutLabel(lockoutRemainingMs)}.`}
-              detail="Wrong answers freeze your controller for a few seconds."
-            />
-          ) : currentQuestion ? (
-            <div className="mt-6 rounded-[1.75rem] border border-white/10 bg-white/[0.06] p-6 text-left">
-              <div className="text-xs font-black uppercase tracking-[0.3em] text-cyan-200">
-                {currentQuestion.format === "boolean" ? "True or false" : "Multiple choice"}
-              </div>
-              <h2 className="mt-3 text-2xl font-black text-white">{currentQuestion.prompt}</h2>
-              <div className="mt-6 grid gap-3">
-                {currentQuestion.options.map((option) => (
-                  <button
-                    key={option.id}
-                    type="button"
-                    onClick={() => handleAnswer(currentQuestion.id, option.id)}
-                    disabled={actionPending}
-                    className="rounded-[1.4rem] border border-white/12 bg-white/[0.08] px-5 py-4 text-left text-base font-semibold text-white transition hover:border-cyan-300/40 hover:bg-cyan-400/10 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            </div>
           ) : (
-            <WaitingPanel
-              eyebrow="Stand by"
-              title="Waiting for your next question."
-              detail="Your controller is synced. The next prompt will appear automatically."
+            <QuestionChestStage
+              gameLabel={currentGameType === "goldrush" ? "Gold Rush" : "QuizDash"}
+              phase={phase}
+              currentQuestion={currentQuestion}
+              recentOutcomeTitle={recentOutcome?.title}
+              recentOutcomeDetail={recentOutcome?.detail}
+              pendingChestPick={false}
+              pendingTargetPick={false}
+              availableTargets={[]}
+              actionPending={actionPending}
+              onAnswer={handleAnswer}
+              onChestPick={handleChestPick}
+              onTargetPick={handleTargetPick}
             />
           )}
 

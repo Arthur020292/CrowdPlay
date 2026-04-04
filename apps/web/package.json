@@ -9,6 +9,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@crowdplay/game-content": "0.1.0",
     "@crowdplay/game-goldrush": "0.1.0",
     "@crowdplay/game-quizdash": "0.1.0",
     "@crowdplay/protocol": "0.1.0",

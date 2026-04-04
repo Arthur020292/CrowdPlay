@@ -78,45 +78,31 @@ function LandingPreview() {
 }
 
 function HostGamesPreview() {
-  const liveTiles = [
-    {
-      title: "Gold Rush",
-      description: "Answer questions, open hidden chests, and unleash chaos on the top vaults.",
-      cta: "Play Gold Rush"
-    },
-    {
-      title: "QuizDash",
-      description: "Answer fast and build distance in a straight-up race to the finish.",
-      cta: "Play QuizDash"
-    }
-  ];
+  const durationOptions = ["1 min", "2 min", "3 min"];
 
   return (
-    <div>
-      <span className="cp-eyebrow cp-eyebrow-light">Choose a game</span>
-      <h1 className="mt-5 text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">Pick what the room will play.</h1>
+    <div className="cp-card-light mx-auto max-w-xl p-8 sm:p-10">
+      <h1 className="text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">Pick match length</h1>
+      <p className="mt-3 text-base text-slate-600 sm:text-lg">Gold Rush is selected. Choose how long the room should run.</p>
 
-      <div className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        {Array.from({ length: 10 }, (_, index) => {
-          const tile = liveTiles[index] ?? null;
-          const isLive = Boolean(tile);
-          return (
-            <div key={index} className={`rounded-[1.9rem] border p-5 text-left ${isLive ? "border-sky-200/90 bg-white/[0.76] shadow-[0_20px_40px_rgba(56,189,248,0.10)] backdrop-blur-[10px]" : "border-slate-200/80 bg-white/[0.54] backdrop-blur-[10px]"}`}>
-              <div className="flex items-center gap-3">
-                <span className={`rounded-full px-3 py-1 text-xs font-black uppercase tracking-[0.26em] ${isLive ? "bg-cyan-100/90 text-cyan-700" : "bg-slate-200/90 text-slate-500"}`}>
-                  {isLive ? "Live" : "Coming soon"}
-                </span>
-              </div>
-              <div className="mt-5 text-2xl font-black text-slate-950">{tile?.title ?? "Coming soon"}</div>
-              <p className="mt-2 text-sm leading-6 text-slate-600">{tile?.description ?? "More CrowdPlay party games are on the way."}</p>
-              <div className="mt-5">
-                <span className={isLive ? "cp-button-primary min-h-[3.8rem] min-w-[10rem] text-base font-black" : "inline-flex min-h-[3.8rem] min-w-[10rem] items-center justify-center rounded-[1.3rem] border border-slate-200/80 bg-white/[0.58] px-4 py-3 text-sm font-black uppercase tracking-[0.18em] text-slate-400"}>
-                  {tile?.cta ?? "Soon"}
-                </span>
-              </div>
+      <div className="mt-8 space-y-3">
+          {durationOptions.map((option, index) => (
+            <div
+              key={option}
+              className={`rounded-[1.4rem] border px-5 py-4 text-center text-lg font-black uppercase tracking-[0.18em] ${
+                index === 1
+                  ? "border-sky-300 bg-sky-100 text-sky-800 shadow-[0_10px_24px_rgba(56,189,248,0.14)]"
+                  : "border-slate-200 bg-white/[0.88] text-slate-600"
+              }`}
+            >
+              {option}
             </div>
-          );
-        })}
+          ))}
+      </div>
+
+      <div className="mt-8 space-y-4">
+        <button className="cp-button-primary w-full text-base font-black">Create room</button>
+        <button className="cp-button-link w-full text-sm">Change game</button>
       </div>
     </div>
   );
@@ -124,7 +110,7 @@ function HostGamesPreview() {
 
 function GoldRushHostPreview({ snapshot }: { snapshot: GoldRushSnapshotEvent }) {
   return (
-    <div className="grid gap-6 xl:min-h-[calc(100vh-3rem)] xl:grid-cols-[1.15fr_0.85fr]">
+    <div className="grid gap-6 xl:h-[calc(100vh-3rem)] xl:grid-cols-[1.15fr_0.85fr]">
       <div className="flex min-h-0 flex-col gap-6">
         <ChaosFeed events={previewChaosEvents} className="flex-1" headerBadge={`Remaining ${formatRemainingLabel(snapshot.phase, snapshot.remainingMs)}`} />
       </div>
